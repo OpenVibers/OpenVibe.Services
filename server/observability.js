@@ -9,9 +9,9 @@
  *                           serve its one capability
  *
  * The authorities are deliberately NOT readiness checks: an authority, or Network, being down degrades
- * the index and never stops it (ADR-046 section 6). A body that could not be read is a partial page,
- * named in X-OpenVibe-Partial-Authorities, not a red readiness — /api/v1/authorities lists the registry
- * as it stands.
+ * the index and never stops it (ADR-046 section 6). A body that could not be read is a partial page
+ * (common.resource-list-result@1's `partial` array), not a red readiness — /api/v1/authorities lists the
+ * registry as it stands.
  *
  * Gauges: the authorities the registry reads. Counts only, never a token, never a resource.
  */

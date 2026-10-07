@@ -15,11 +15,10 @@
  *   - a local filter for `project` / `kind` / `service` on top of the authorities' own answers: a
  *     scoped read (a person's, above all) must never show a row outside its scope even if an authority
  *     ignores a query parameter,
- *   - and the partial answer. common.resource-list-result@1 has no field for the authorities that
- *     could not be read (its only fields are `resources` and `next_cursor`, additionalProperties:
- *     false), so a partial page names them in the X-OpenVibe-Partial-Authorities response header —
- *     their rows are omitted, the rest of the page is served (ADR-046 section 6: an authority, or
- *     Network, being down degrades the index; it never stops it).
+ *   - and the partial answer. common.resource-list-result@1's `partial` array (contracts 1.1.0) names
+ *     the authorities this merge could not read and the problem code each answered — their rows are
+ *     omitted, the rest of the page is served (ADR-046 section 6: an authority, or Network, being
+ *     down degrades the index; it never stops it). A complete page carries no `partial` key at all.
  *
  * One resource is never merged: /api/v1/resources/:ovrn parses the name with the one parser
  * (contracts.resources.parse), resolves the owning service and asks that authority directly.
@@ -31,6 +30,15 @@ const { ServiceError, parseOvrn } = require('./util');
 
 const CURSOR_V = 'v1';
 const SEP = '\u0000';
+
+/**
+ * The problem code a partial page names for one authority. The authority's own problem code when it
+ * answered one; Services' own resources.* codes when nothing answered — resources.authority_timeout when the request or
+ * the cursor walk timed out, resources.authority_unavailable when the network (or Network's token mint)
+ * failed. The codes live here, in the body only; nothing new is registered in contracts.
+ */
+const PARTIAL_CODES = Object.freeze({ 'sdk.timeout': 'resources.authority_timeout', 'sdk.network_error': 'resources.authority_unavailable' });
+const partialCodeOf = (stale) => PARTIAL_CODES[stale.code] || stale.code || 'resources.authority_unavailable';
 
 /** The order a page is cut in: service, then the OVRN when the summary has one (else its id). */
 const sortKeyOf = (r) => `${r.service}${SEP}${r.ovrn || ''}${SEP}${r.id}`;
@@ -68,8 +76,9 @@ function createResourceIndexService({ config, authorities, tokens, fetchImpl = g
     }
 
     /**
-     * One merged page. `{ resources, next_cursor, partial }` — `partial` lists the authority ids whose
-     * rows this page could not include (their cursor walk failed, timed out or was refused).
+     * One merged page. `{ resources, next_cursor, partial }` — `partial` lists `{ service, code }` for the
+     * authorities whose rows this page could not include (their cursor walk failed, timed out or was
+     * refused), `code` being the problem code each one answered, in the caller's terms.
      */
     async function list({ project = null, kind = null, service = null, cursor = null, limit = config.index.defaultLimit } = {}) {
         const set = service ? adapters.filter((a) => a.authority.id === service) : adapters;
@@ -87,12 +96,12 @@ function createResourceIndexService({ config, authorities, tokens, fetchImpl = g
         if (cursor && after === null) throw new ServiceError(400, 'resources.bad_query', 'cursor must be one this index issued');
         const rest = after ? merged.filter((r) => compare(sortKeyOf(r), after) > 0) : merged;
         const page = rest.slice(0, limit);
-        const partial = stale.map((s) => idByOrigin.get(s.authority) || s.authority);
+        const partial = stale.map((s) => ({ service: idByOrigin.get(s.authority) || s.authority, code: partialCodeOf(s) }));
         // One line when the set of silent authorities changes — an operator wants to know, a log wants no
-        // flood; the caller reads the same fact from the header.
-        const signature = partial.join(',');
+        // flood; the caller reads the same fact from the response body's `partial`.
+        const signature = partial.map((p) => `${p.service} (${p.code})`).join(', ');
         if (signature !== lastPartial) {
-            if (signature) log.warn(`[Services] index partial: ${signature} did not answer`);
+            if (signature) log.warn(`[Services] index partial: ${signature}`);
             lastPartial = signature;
         }
         return {
