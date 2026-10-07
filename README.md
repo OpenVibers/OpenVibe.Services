@@ -143,7 +143,7 @@ otherwise every authority refuses and the index is partial (correctly, and visib
 ## Versions
 
 <!-- versions:start -->
-- openvibe-contracts: v0.110.0
+- openvibe-contracts: v0.112.0
 - openvibe-sdk: v0.34.0
 - openvibe-shared: v2.12.0
 <!-- versions:end -->
