@@ -1,0 +1,33 @@
+[Unit]
+Description=OpenVibe.Services — the resource control plane (authority registry, resource index; plan T13, ADR-048)
+# Network (sign-in, JWKS, OAuth, projects) should be up first, and Services' own PostgreSQL (pooled
+# runtime role plus the direct owner role for migrations) is required to serve. The authorities are
+# NOT required: an authority being down degrades the index into a partial page, it never stops Services
+# (ADR-046 section 6), so nothing here Wants their units.
+After=network.target postgresql.service pgbouncer.service
+Wants=openvibe-network.service postgresql.service pgbouncer.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/openvibe.services
+EnvironmentFile=/etc/openvibe/services.env
+Environment=NODE_ENV=production
+Environment=PORT=4930
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node /opt/openvibe.services/server/index.js
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Services reads no file from under its own tree at request time (the migration directory is read at
+# boot) and holds no credential of its own: the authority tokens are minted from OV_OAUTH_CLIENT_SECRET
+# in /etc/openvibe/services.env (0600) and are never written anywhere.
+
+[Install]
+WantedBy=multi-user.target

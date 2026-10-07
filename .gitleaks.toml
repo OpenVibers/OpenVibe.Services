@@ -1,0 +1,9 @@
+# gitleaks configuration, used by the shared security workflow
+# (OpenVibers/OpenVibe.Shared/.github/workflows/security.yml). The default rules stay on; every
+# allowlist below is one proven false positive, matched on path AND value so nothing else is hidden.
+#
+# Services stores no credential of its own: the authority tokens are Network client-credentials tokens
+# minted at call time from OV_OAUTH_CLIENT_ID / OV_OAUTH_CLIENT_SECRET (.env.example carries names only)
+# and never written to disk, a log line or a response body. Nothing here needs an allowlist yet.
+[extend]
+useDefault = true

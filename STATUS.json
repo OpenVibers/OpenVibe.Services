@@ -1,0 +1,41 @@
+{
+  "repository": "OpenVibers/OpenVibe.Services",
+  "stage": "alpha",
+  "code": true,
+  "wave": "W13",
+  "plan": "OpenVibe Updated Plan Based On Codebase (plan T13, ADR-048)",
+  "runtime": "node 22, express 4, PostgreSQL 18 (openvibe-sdk/db)",
+  "port": 4930,
+  "domain": "openvibe.services",
+  "contracts": "openvibe-contracts v0.108.0",
+  "sdk": "openvibe-sdk v0.34.0",
+  "shared": "openvibe-shared v2.11.0",
+  "packages": [
+    "openvibe-contracts v0.108.0",
+    "openvibe-sdk v0.34.0",
+    "openvibe-shared v2.11.0"
+  ],
+  "capabilities": [
+    "services.resource.read"
+  ],
+  "capabilitiesRegistered": false,
+  "capabilitiesNote": "PROPOSED (server/auth.js): services.resource.read is not in the pinned openvibe-contracts yet; plan T13 step 4 registers it (and the later services.resource.control, services.recipe.run, services.usage.read, services.cost.read) after this repository exists. Services enforces exactly the id it will register.",
+  "events": [],
+  "deployed": false,
+  "deployment": "Not deployed: openvibe.services has no DNS, no ovhost inventory entry, no ov_services database and no /etc/openvibe/services.env yet. The release is deploy/ (nginx vhost deploy/nginx/openvibe.services.conf, unit deploy/systemd/openvibe-services.service, WorkingDirectory /opt/openvibe.services, EnvironmentFile /etc/openvibe/services.env, PORT 4930). The vhost proxies /api/health, /api/ready, /release.json and /api/, takes the client address from $remote_addr only (never appending X-Forwarded-For), and refuses /internal/ and /metrics at the edge; the app refuses a proxied /metrics caller itself. The first deploy needs Services' Network client (OV_OAUTH_CLIENT_ID=services with its secret) granted every authority's <id>.resource.read scope, or the fan-out reports every authority partial.",
+  "features": [
+    "the authority registry (server/authorities/index.js): built at boot from the pinned openvibe-contracts service manifests — every non-placeholder service whose manifest lists an active <id>.resource.read is an authority (at v0.108.0: network, events, host, codes, media), with its manifest internalOrigin (SERVICES_<ID>_URL overrides) and audience openvibe.<id>; Services itself is never an authority",
+    "one adapter per authority (server/authorities/adapter.js): GET /api/v1/resources and GET /api/v1/resources/:ovrn over that authority's loopback origin with a Network client-credentials token for its audience, scoped to its resource.read capability and cached (one mint per authority, refreshed 60 s before expiry; server/authorities/tokens.js)",
+    "the merged resource index (server/resources.js, GET /api/v1/resources?project=&kind=&service=&cursor=&limit=): openvibe-sdk/resources' createResourceIndex fans out and merges every authority's pages (per-authority cursor walk, concurrency 4, per-authority timeout), Services adds a deterministic (service, ovrn, id) total order and an opaque keyset cursor, and filters project/kind/service locally so a scoped read never shows a row outside its scope",
+    "a slow, refusing or unreachable authority (or a Network that cannot mint its token) never fails the page: its rows are omitted and it is named in the X-OpenVibe-Partial-Authorities header — common.resource-list-result@1 has no field for it (ADR-046 section 6; the contract gap is recorded in the README)",
+    "GET /api/v1/resources/:ovrn routes the name with openvibe-contracts' one parser to the authority that owns it and answers its common.resource-summary@1; a malformed name or an unknown service is 400, the authority's 404 is 404, anything else is 502",
+    "GET /api/v1/authorities: the registry as it stands (id, origin, audience, capability, manifest version) — Services-local, no contract yet",
+    "who may read: a first-party svc: Network service token holding services.resource.read, or a person's user token scoped to ONE project they own or belong to, verified with the caller's own token against Network's developer projects API (GET /api/v1/projects/:project; non-members are 404, existence is not disclosed). Never an unscoped person, and never an app, mod or agent token even with the grant",
+    "the kernel: config/db (PGlite in development, PostgreSQL through PgBouncer in production; migrations applied at boot), truthful /api/ready (db and network_jwks required; a down authority is a partial page, not a red readiness), loopback-only /metrics, /api/health, /release.json, RFC 9457 problem+json everywhere, and the openvibe-sdk outbox (idle: no services.* event type is registered yet, plan T13 step 10)",
+    "migrations/0001_initial.sql: Services' own rows only (services_authorities, services_resources, services_catalog_entries, services_recipes, services_recipe_runs, services_control_log, services_events_outbox) — Services never writes another service's database (ADR-048)"
+  ],
+  "notYet": [
+    "plan T13 step 4 (OpenVibe.Contracts registers the services.* capabilities, the service manifest leaves placeholder), step 5 done in Network, step 7 (read model + ingestion), steps 9-15 (console, control operations, recipes, usage, deploy)"
+  ],
+  "updated": "2026-10-07"
+}

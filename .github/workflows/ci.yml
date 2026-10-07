@@ -1,0 +1,21 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  # install, node --check, npm test and openvibe-contracts-check: the shared test job (Track Q).
+  # contracts-service: services — Services' own manifest is a placeholder until plan T13 step 4 registers
+  # it (and services.resource.read, PROPOSED in server/auth.js until then), so the check reads this
+  # repository's use of the pinned contracts; the contract ids it validates today: common.resource-summary@1.
+  test:
+    uses: OpenVibers/OpenVibe.Shared/.github/workflows/test.yml@423fe519b5fe9594cc81b670e5ba5cb9f21f6176
+    with:
+      contracts-service: services
+      # ADR-035: PostgreSQL 18 + PgBouncer (transaction mode) + Valkey 9 containers (openvibe-sdk
+      # scripts/test-services.sh). npm test runs every file on PGlite; test:pg runs them all on the
+      # containers through PgBouncer (SERVICES_TEST_STORE=pg).
+      test: 'eval "$(node_modules/openvibe-sdk/scripts/test-services.sh up)" && npm test && npm run test:pg'
+  # Secret scan (gitleaks) and dependency audit, shared by every OpenVibers repo (Track Q).
+  security:
+    uses: OpenVibers/OpenVibe.Shared/.github/workflows/security.yml@423fe519b5fe9594cc81b670e5ba5cb9f21f6176
