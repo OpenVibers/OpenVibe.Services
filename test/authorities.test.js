@@ -1,10 +1,10 @@
 'use strict';
 /**
- * server/authorities/index.js against the REAL pinned openvibe-contracts (v0.108.0): the registry is
+ * server/authorities/index.js against the REAL pinned openvibe-contracts (v0.110.0): the registry is
  * derived from the released service manifests — every non-placeholder service whose manifest lists an
  * active <id>.resource.read — and never hand-maintained. The five authorities of the pin, their manifest
- * loopback origins and their audiences; Services itself, placeholders and services without the
- * capability are not authorities.
+ * loopback origins and their audiences; Services itself (whose manifest now lists
+ * services.resource.read), placeholders and services without the capability are not authorities.
  *
  *   node test/authorities.test.js
  */
@@ -17,10 +17,12 @@ const { check, done } = require('./helpers/app');
 const quiet = { warn() {}, log() {}, error() {} };
 
 async function main() {
-    await check('the pin lists exactly five active <id>.resource.read authorities', () => {
+    await check('the pin lists six active <id>.resource.read capabilities, five of them authorities', () => {
         const ids = contracts.capabilities.manifests.filter((c) => /^([a-z][a-z0-9-]{0,31})\.resource\.read$/.test(c.id)).map((c) => c.id).sort();
-        assert.deepStrictEqual(ids, ['codes.resource.read', 'events.resource.read', 'host.resource.read', 'media.resource.read', 'network.resource.read']);
+        assert.deepStrictEqual(ids, ['codes.resource.read', 'events.resource.read', 'host.resource.read', 'media.resource.read', 'network.resource.read', 'services.resource.read']);
         for (const id of ids) assert.strictEqual(contracts.capabilities.get(id).status, 'active', id);
+        // services.resource.read is Services' own id; Services is never its own authority (the next check).
+        assert.ok(!createAuthorities(loadConfig({}), { log: quiet }).ids().includes('services'));
     });
 
     await check('the registry is built from those manifests, with the manifest origins and audiences', () => {

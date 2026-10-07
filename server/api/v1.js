@@ -5,12 +5,12 @@
  *
  * | Method & path              | Capability                 | Request → answer                                          |
  * |----------------------------|----------------------------|-----------------------------------------------------------|
- * | GET /api/v1/resources      | services.resource.read     | ?project=&kind=&service=&cursor=&limit= → common.resource-list-result@1 (merged over every authority; the authorities a page could not read are named in X-OpenVibe-Partial-Authorities) |
+ * | GET /api/v1/resources      | services.resource.read     | ?project=&kind=&service=&cursor=&limit= → common.resource-list-result@1 (merged over every authority; a page that could not read one names it in `partial: [{ service, code }]`) |
  * | GET /api/v1/resources/:ovrn| services.resource.read     | common.no-body@1 → common.resource-summary@1 from the authority that owns it |
  * | GET /api/v1/authorities    | services.resource.read     | common.no-body@1 → { authorities: […] } (Services-local; no contract yet) |
  *
- * services.resource.read is PROPOSED (server/auth.js): it is not in the pinned openvibe-contracts yet
- * (plan T13 step 4 registers it), and Services enforces exactly the id it will register.
+ * services.resource.read is registered in the pinned openvibe-contracts (status active, visibility
+ * first-party): contracts' manifest decides it, and an id contracts does not know is refused, never allowed.
  *
  * Who may call: a Network service token holding services.resource.read (any project, ?project= only
  * narrows), or a person's user token — scoped to ONE project they own or belong to, verified with their
@@ -63,14 +63,16 @@ function v1Router({ config, apiAuth, index, authorities }) {
     const r = express.Router();
 
     // One merged page over every authority (or the one ?service= names). A failing authority's rows are
-    // omitted and named in the partial header; the rest of the page is served.
+    // omitted and named in the body's `partial` array (common.resource-list-result@1); the rest of the
+    // page is served, and a complete page carries no `partial` key at all.
     r.get('/resources', async (req, res) => {
         apiAuth.requireRead(req);
         const filter = listQuery(req.query, config);
         const scope = await apiAuth.authorizeProject(req, filter.project);
         const page = await index.list({ ...filter, project: scope.project });
-        if (page.partial.length) res.set('X-OpenVibe-Partial-Authorities', page.partial.join(', '));
-        res.json({ resources: page.resources, next_cursor: page.next_cursor });
+        res.json(page.partial.length
+            ? { resources: page.resources, next_cursor: page.next_cursor, partial: page.partial }
+            : { resources: page.resources, next_cursor: page.next_cursor });
     });
 
     // One resource by its OVRN, straight from the authority that owns it. The OVRN is parsed first (400),

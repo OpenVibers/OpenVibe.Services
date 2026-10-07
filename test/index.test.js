@@ -2,13 +2,13 @@
 /**
  * The resource index over stub authorities (plan T13 step 6): the fan-out and merge (openvibe-sdk/
  * resources), the merged page and its stable cursor, the project/kind/service filters, the person-facing
- * scoping, an authority that times out or refuses (a partial page, never a failed one), the :ovrn route,
- * and the token cache (one mint per authority).
+ * scoping, an authority that times out or refuses (a body-partial page, never a failed one), the :ovrn
+ * route, and the token cache (one mint per authority).
  *
  *   node test/index.test.js
  */
 const assert = require('assert');
-const { ids } = require('openvibe-contracts');
+const { ids, validate } = require('openvibe-contracts');
 const { boot, check, done, newProject } = require('./helpers/app');
 const { summary } = require('./helpers/stubs');
 
@@ -38,7 +38,7 @@ async function main() {
             do {
                 const r = await t.call('GET', `/api/v1/resources?limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, {});
                 assert.strictEqual(r.status, 200, r.text);
-                assert.strictEqual(r.headers.get('x-openvibe-partial-authorities'), null, 'no authority is partial here');
+                assert.ok(!('partial' in r.json), 'no authority is partial here: a complete page has no partial key');
                 assert.ok(r.json.resources.length <= 2, 'limit=2');
                 seen.push(...ovrnsOf(r.json));
                 cursor = r.json.next_cursor;
@@ -129,7 +129,7 @@ async function main() {
             } finally { await lenient.close(); }
         });
 
-        await check('a slow authority is omitted and named; the rest of the page is served', async () => {
+        await check('a slow authority is omitted and named in the body; the rest of the page is served', async () => {
             const slow = await boot({
                 authorities: [
                     { id: 'alpha', resources: alpha },
@@ -140,7 +140,7 @@ async function main() {
             try {
                 const r = await slow.call('GET', '/api/v1/resources');
                 assert.strictEqual(r.status, 200, r.text);
-                assert.strictEqual(r.headers.get('x-openvibe-partial-authorities'), 'beta');
+                assert.deepStrictEqual(r.json.partial, [{ service: 'beta', code: 'resources.authority_timeout' }], 'a timed-out authority is named with Services’ own timeout code');
                 const got = ovrnsOf(r.json);
                 assert.deepStrictEqual(got.slice().sort(), [...alpha, ...gamma].map((x) => x.ovrn).sort());
                 assert.deepStrictEqual(r.json.resources, r.json.resources.slice().sort((a, b) => (a.ovrn < b.ovrn ? -1 : 1)), 'partial does not disturb the order');
@@ -152,9 +152,28 @@ async function main() {
             try {
                 const r = await refusing.call('GET', '/api/v1/resources');
                 assert.strictEqual(r.status, 200, r.text);
-                assert.strictEqual(r.headers.get('x-openvibe-partial-authorities'), 'beta');
+                assert.deepStrictEqual(r.json.partial, [{ service: 'beta', code: 'authority.refused' }], 'a refusing authority is named with the problem code it answered');
                 assert.ok(ovrnsOf(r.json).includes(alpha[0].ovrn));
             } finally { await refusing.close(); }
+        });
+
+        await check('a complete page has no partial; a partial page validates against common.resource-list-result@1', async () => {
+            const complete = await t.call('GET', '/api/v1/resources');
+            assert.strictEqual(complete.status, 200, complete.text);
+            assert.ok(!('partial' in complete.json), 'a complete page carries no partial key');
+            const completeCheck = validate('common.resource-list-result@1', complete.json);
+            assert.ok(completeCheck.valid, `a complete page is a common.resource-list-result@1: ${JSON.stringify(completeCheck.errors)}`);
+
+            const one = await boot({ authorities: [{ id: 'alpha', resources: alpha }, { id: 'beta', resources: beta, status: 503 }] });
+            try {
+                const r = await one.call('GET', '/api/v1/resources');
+                assert.strictEqual(r.status, 200, r.text);
+                assert.deepStrictEqual(r.json.partial, [{ service: 'beta', code: 'authority.refused' }], 'partial names the authority and the problem code it answered');
+                const result = validate('common.resource-list-result@1', r.json);
+                assert.ok(result.valid, `a partial page is a common.resource-list-result@1 (partial included): ${JSON.stringify(result.errors)}`);
+                assert.ok(r.json.resources.length > 0, 'the rest of the page is served');
+                assert.ok(!r.headers.get('x-openvibe-partial-authorities'), 'the partial authorities are a body field now, never a header');
+            } finally { await one.close(); }
         });
 
         await check('GET /api/v1/resources/:ovrn asks the owning authority and answers its summary', async () => {
@@ -218,7 +237,7 @@ async function main() {
             try {
                 const r = await broken.call('GET', '/api/v1/resources');
                 assert.strictEqual(r.status, 200, r.text);
-                assert.strictEqual(r.headers.get('x-openvibe-partial-authorities'), 'alpha');
+                assert.deepStrictEqual(r.json.partial, [{ service: 'alpha', code: 'resources.authority_unavailable' }], 'a token mint that fails leaves the authority named unavailable');
                 assert.deepStrictEqual(r.json.resources, []);
             } finally { await broken.close(); }
         });

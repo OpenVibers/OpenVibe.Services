@@ -14,10 +14,10 @@
  *
  * A request that presents a token is judged on that token alone: a bad one is refused, never downgraded.
  *
- * Capabilities: Services' capability ids are not registered in openvibe-contracts yet (plan T13 step 4
- * registers them after this repository exists). They live here in PROPOSED, and PROPOSED ids are decided
- * with contracts' own grant rules (wildcards included) so that what step 4 registers is exactly what
- * Services enforces. Once an id is registered, the contracts manifest decides, unchanged.
+ * Capabilities: services.resource.read is registered in the pinned openvibe-contracts (status active,
+ * visibility first-party), so contracts' manifest and grant rules decide it (wildcards included) — and
+ * an id contracts does not know is refused, never allowed. Services enforces exactly the id the manifest
+ * names. services.resource.control arrives with plan T13 step 10.
  */
 const { serviceAuth, capabilities, http, ids } = require('openvibe-contracts');
 const { ServiceError } = require('./util');
@@ -27,20 +27,15 @@ const PROJECT_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
 const ANON = Object.freeze({ kind: 'anonymous' });
 
 /**
- * The capabilities Services enforces (PROPOSED: no manifest in the pinned openvibe-contracts yet).
- * services.resource.read is the whole read side of the resource index (list, one, the authority list).
+ * The capabilities Services enforces. services.resource.read — active and first-party in the pinned
+ * openvibe-contracts — is the whole read side of the resource index (list, one, the authority list).
  * services.resource.control arrives with plan T13 step 10.
  */
 const CAPS = Object.freeze({ resourceRead: 'services.resource.read' });
-const PROPOSED = Object.freeze(new Set(Object.values(CAPS)));
 
-/** One capability against a token's claims: contracts' manifest where there is one, the PROPOSED grant rules where not. */
+/** One capability against a token's claims: contracts' manifest and grant rules decide; an unknown id is refused. */
 function capabilityDecision(claims, id) {
-    if (!PROPOSED.has(id)) return capabilities.check(claims, id);
-    const allowed = capabilities.grants(claims && claims.cap, id);
-    return allowed
-        ? { allowed: true, code: null, reason: null }
-        : { allowed: false, code: 'capability.denied', reason: `${id} not granted` };
+    return capabilities.check(claims, id);
 }
 
 function decodePayload(token) {
@@ -153,4 +148,4 @@ function createApiAuth({ config, keys, userAuth, membership }) {
     return { middleware, resolve, capabilityDecision, requireRead, requireServiceRead, authorizeProject, projectOf };
 }
 
-module.exports = { createApiAuth, capabilityDecision, userPrincipal, verifyService, decodePayload, projectOf, CAPS, PROPOSED, PROJECT_RE, PRINCIPAL_SUB };
+module.exports = { createApiAuth, capabilityDecision, userPrincipal, verifyService, decodePayload, projectOf, CAPS, PROJECT_RE, PRINCIPAL_SUB };

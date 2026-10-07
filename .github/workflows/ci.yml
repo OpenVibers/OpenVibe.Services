@@ -5,9 +5,9 @@ on:
   pull_request:
 jobs:
   # install, node --check, npm test and openvibe-contracts-check: the shared test job (Track Q).
-  # contracts-service: services — Services' own manifest is a placeholder until plan T13 step 4 registers
-  # it (and services.resource.read, PROPOSED in server/auth.js until then), so the check reads this
-  # repository's use of the pinned contracts; the contract ids it validates today: common.resource-summary@1.
+  # contracts-service: services — plan T13 step 4 registered Services' manifest and services.resource.read
+  # (openvibe-contracts v0.110.0), so the check reads this repository's use of the pinned contracts; the
+  # contract ids it validates today: common.resource-summary@1, common.resource-list-result@1.
   test:
     uses: OpenVibers/OpenVibe.Shared/.github/workflows/test.yml@423fe519b5fe9594cc81b670e5ba5cb9f21f6176
     with:

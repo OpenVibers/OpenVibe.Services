@@ -32,14 +32,16 @@ a report should assume:
 - **a scoped read stays scoped.** Services filters `project` (and `kind`, `service`) on the merged rows itself, so an
   authority that ignores a query parameter cannot leak another project's resource into a person's page.
 - **a service token is judged on its own claims.** Audience `openvibe.services`, `svc:` principal, capability
-  `services.resource.read` (PROPOSED until plan T13 step 4 registers it — enforced with contracts' own grant rules).
+  `services.resource.read` (registered in the pinned openvibe-contracts, active and first-party — enforced with
+  contracts' own manifest and grant rules).
   A bad token is refused, never downgraded to anonymous, and an app, mod or agent token is refused even with the
   grant: a person reads with their own user token, never through a developer app's credential.
 - **no secret is stored, logged or served.** The per-authority client-credentials tokens are minted at call time,
   cached in memory with a 60 s refresh skew and never written to disk, a log line or a response body. The only route
   that shows operational detail, `GET /api/v1/authorities`, is first-party (a service token) and carries no secret.
-- **a failure degrades, it never stops.** An authority or Network being down yields a partial page named in
-  `X-OpenVibe-Partial-Authorities`; the rest of the index keeps serving (ADR-046 section 6).
+- **a failure degrades, it never stops.** An authority or Network being down yields a partial page whose body's
+  `partial: [{ service, code }]` names the authorities that did not answer; the rest of the index keeps serving
+  (ADR-046 section 6).
 - nothing starts at module load (the key refresher and the outbox relay start in `server/index.js` `main()`), and
   `/metrics` answers only a direct loopback caller that no proxy relayed.
 
