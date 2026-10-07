@@ -116,7 +116,7 @@ There is no polling loop: the index reads the authorities on each request (step 
   per-authority tokens, and the developer projects API for membership.
 - The authorities: network (`http://127.0.0.1:4000`), media (4100), events (4300), codes (4900), host (4910) at the
   current pin. Every one of them is optional to serve, by design.
-- `openvibe-contracts` v0.110.0, `openvibe-sdk` v0.34.0, `openvibe-shared` v2.12.0 (package.json).
+- `openvibe-contracts` v0.110.0, `openvibe-sdk` v0.35.0, `openvibe-shared` v2.12.0 (package.json).
 
 ## Tests
 
@@ -144,6 +144,6 @@ otherwise every authority refuses and the index is partial (correctly, and visib
 
 <!-- versions:start -->
 - openvibe-contracts: v0.112.0
-- openvibe-sdk: v0.34.0
+- openvibe-sdk: v0.35.0
 - openvibe-shared: v2.12.0
 <!-- versions:end -->
