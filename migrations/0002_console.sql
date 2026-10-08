@@ -1,7 +1,9 @@
 -- phase: expand
--- OpenVibe.Services on PostgreSQL (ADR-035, roadmap WS-X2): the tables as they were on SQLite (converted by openvibe-sdk
--- tools/asyncify/sqlite-schema-to-pg: text COLLATE "C" compares like SQLite, integers are bigint, identities keep their ids),
--- then the openvibe-publishing stores and the openvibe-sdk inbox and outbox. Generated once on 2026-09-28; never edited after it runs.
+-- The console's own records (ADR-014), moved here from OpenVibe.Codes on 2026-10-08 with the developer portal: validated
+-- app and mod manifests, releases and their append-only log, trust tiers (metadata, never authority) and playground run
+-- logs. Projects, members, apps, credentials, grants and quotas stay OpenVibe.Network's. The tables are Codes' exactly as
+-- its migration 0001 created them (text COLLATE "C", bigint identities), so its rows copy across unchanged; events go
+-- through Services' own outbox (services_events_outbox, migration 0001).
 
 CREATE TABLE manifests (
     id           text COLLATE "C" PRIMARY KEY,               -- mfs_<ULID>
