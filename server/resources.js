@@ -51,8 +51,13 @@ function decodeCursor(raw) {
     return Array.isArray(v) && v.length === 2 && v[0] === CURSOR_V && typeof v[1] === 'string' ? v[1] : null;
 }
 
-function createResourceIndexService({ config, authorities, tokens, fetchImpl = globalThis.fetch, log = console }) {
+/**
+ * opts.self: Services' own resources as an authority read in process (server/registry/self-authority.js), next to
+ * the authorities the registry reads over HTTP.
+ */
+function createResourceIndexService({ config, authorities, tokens, self = null, fetchImpl = globalThis.fetch, log = console }) {
     const adapters = authorities.list().map((a) => createAuthorityAdapter(a, { tokens, fetchImpl, timeoutMs: config.index.timeoutMs }));
+    if (self) adapters.push(self);
     const adapterById = new Map(adapters.map((a) => [a.authority.id, a]));
     const idByOrigin = new Map(adapters.map((a) => [a.origin, a.authority.id]));
     const indexes = new Map();

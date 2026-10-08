@@ -1,11 +1,11 @@
 [Unit]
-Description=OpenVibe.Services — the resource control plane (authority registry, resource index; plan T13, ADR-048)
+Description=OpenVibe.Services — the developer platform (the console over Network's projects API, generated docs, tools, releases, the resource index; plan T13, ADR-048)
 # Network (sign-in, JWKS, OAuth, projects) should be up first, and Services' own PostgreSQL (pooled
-# runtime role plus the direct owner role for migrations) is required to serve. The authorities are
-# NOT required: an authority being down degrades the index into a partial page, it never stops Services
-# (ADR-046 section 6), so nothing here Wants their units.
-After=network.target postgresql.service pgbouncer.service
-Wants=openvibe-network.service postgresql.service pgbouncer.service
+# runtime role plus the direct owner role for migrations) is required to serve. Services degrades honestly
+# without the rest: docs, tools and policy pages serve; project pages show Network's failure; events wait in
+# the outbox; an authority being down makes the index a partial page (ADR-046 section 6), never a stop.
+After=network.target postgresql.service pgbouncer.service valkey-server.service
+Wants=openvibe-network.service postgresql.service pgbouncer.service valkey-server.service
 
 [Service]
 Type=simple

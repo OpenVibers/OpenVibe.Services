@@ -20,7 +20,7 @@
  * names. services.resource.control arrives with plan T13 step 10.
  */
 const { serviceAuth, capabilities, http, ids } = require('openvibe-contracts');
-const { ServiceError } = require('./util');
+const { ServiceError } = require('../util');
 
 const PRINCIPAL_SUB = /^(svc|app|mod|agent):/;
 const PROJECT_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -71,12 +71,19 @@ const projectOf = (principal) => {
     return typeof id === 'string' && PROJECT_RE.test(id) ? id : null;
 };
 
+/** The PEM a token verifies against: the key store's per-kid lookup when it has one, else its current key. */
+async function keyFor(keys, token) {
+    if (typeof keys.pemForToken === 'function') return (await keys.pemForToken(token)) || keys.get();
+    return keys.get();
+}
+
 function createApiAuth({ config, keys, userAuth, membership }) {
     async function resolve(req) {
         const header = String(req.headers.authorization || '');
         if (!header.startsWith('Bearer ')) return { principal: ANON };
         const token = header.slice(7).trim();
-        const publicKey = keys.get();
+        // The key the token's header names (a rotation publishes two keys), from the key store's JWKS client.
+        const publicKey = await keyFor(keys, token);
         if (!publicKey) return { error: [503, 'identity.unavailable', 'the Network signing key is not loaded yet'] };
         const payload = decodePayload(token);
         if (payload && typeof payload.sub === 'string' && PRINCIPAL_SUB.test(payload.sub)) {
@@ -148,4 +155,4 @@ function createApiAuth({ config, keys, userAuth, membership }) {
     return { middleware, resolve, capabilityDecision, requireRead, requireServiceRead, authorizeProject, projectOf };
 }
 
-module.exports = { createApiAuth, capabilityDecision, userPrincipal, verifyService, decodePayload, projectOf, CAPS, PROJECT_RE, PRINCIPAL_SUB };
+module.exports = { createApiAuth, keyFor, capabilityDecision, userPrincipal, verifyService, decodePayload, projectOf, CAPS, PROJECT_RE, PRINCIPAL_SUB };

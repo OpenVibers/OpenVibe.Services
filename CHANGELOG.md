@@ -4,6 +4,29 @@ Notable changes to OpenVibe.Services. The service is unreleased; everything belo
 
 ## Unreleased
 
+### Changed
+
+- **The developer portal moved here from OpenVibe.Codes** (owner decision 2026-10-08; Codes became the open coding-agent
+  harness). Services is now the developer platform at `https://openvibe.services`: the console over Network's
+  projects API (projects, members, apps, credentials shown once, grants through the scope editor, usage, audit,
+  project export, the full archive and delete), app and mod releases with trust tiers and their public pages,
+  grant-respecting playgrounds, the generated reference (`/docs`: API explorer, contracts, capabilities, events,
+  SDK, ADRs, limits, billing policy, export format), the OAuth helper, the webhook tester, manifest validation, the
+  policy pages, Network SSO with PKCE, and the crawl artifacts. The code is Codes' as it ran, renamed: capabilities
+  `services.release.read|manage`, events `services.app.*` and `services.moderation.action`, kinds `services.manifest`
+  and `services.release`, schema `services.app-manifest@1` (openvibe-contracts v0.113.0, which retired the `codes.*`
+  forms); environment `SERVICES_*` for the console's settings; cookies `services_at`/`services_rt`. Production data in
+  Codes was nil, so nothing is copied: migration `0002_console.sql` creates the console's tables.
+- Services' own manifests and releases join the merged index in process (`server/registry/self-authority.js`); the
+  index's tokens are verified with the key their header names (the SDK's JWKS client, shared with sign-in).
+- One key store (`server/auth/keys.js`, openvibe-sdk/auth) replaces the index's own JWKS loader; `OV_NETWORK_PUBLIC_KEY`
+  is gone.
+- The code-of-conduct, contributing, contributor-ladder and moderation documents stay with OpenVibe.Codes, where
+  OpenVibe itself is built; `/policy/<slug>` redirects there, and the coding-harness catalog is Codes' too.
+- openvibe-contracts v0.113.0, openvibe-sdk v0.35.1, openvibe-shared v2.13.3.
+
+## Earlier (unreleased kernel)
+
 ### Added
 
 - The repository kernel (plan T13 step 3): `server/config.js` on port 4930, `server/db.js` (PGlite in
