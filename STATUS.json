@@ -9,7 +9,7 @@
   "domain": "openvibe.services",
   "contracts": "openvibe-contracts v0.112.0",
   "sdk": "openvibe-sdk v0.35.0",
-  "shared": "openvibe-shared v2.12.0",
+  "shared": "openvibe-shared v2.13.2",
   "packages": [
     "openvibe-contracts v0.110.0",
     "openvibe-sdk v0.34.0",
@@ -37,5 +37,5 @@
   "notYet": [
     "plan T13 step 4 done in OpenVibe.Contracts v0.110.0 (services.resource.read is registered, active and first-party), step 5 done in Network, step 7 (read model + ingestion), steps 9-15 (console, control operations, recipes, usage, deploy)"
   ],
-  "updated": "2026-10-07"
+  "updated": "2026-10-08"
 }
