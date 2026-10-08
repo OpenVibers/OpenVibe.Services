@@ -5,7 +5,7 @@
  * and where each one listens.
  *
  * An authority is a service whose released openvibe-contracts manifest lists `<id>.resource.read` as
- * `active`. At v0.110.0 that is network, media, events, host and codes; the moment a service's manifest
+ * `active`. At v0.113.0 that is network, media, events and host (and Services itself, in process); the moment a service's manifest
  * (and its capability manifest) turn that on, it is in this registry on the next boot — nothing here is
  * hand-maintained, and nothing here is another service's data. Services itself is never an authority:
  * it reads authorities, it does not index itself. A `retired` or `placeholder` service is not called.

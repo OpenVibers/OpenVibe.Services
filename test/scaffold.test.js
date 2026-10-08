@@ -15,25 +15,28 @@ async function main() {
         await check('liveness: GET /api/health says only what it can back', async () => {
             const r = await t.call('GET', '/api/health', { token: null });
             assert.strictEqual(r.status, 200, r.text);
-            assert.strictEqual(r.json.ok, true);
+            assert.strictEqual(r.json.status, 'ok');
             assert.strictEqual(r.json.service, 'services');
             assert.strictEqual(r.json.version, require('../package.json').version);
             assert.strictEqual(r.json.authorities, 0);                       // no authority in this boot
             assert.strictEqual(r.json.events.enabled, false);                // EVENTS_URL unset in the test
-            assert.strictEqual(r.json.events.pending, 0);                    // no event type declared yet
+            assert.strictEqual(r.json.events.pending, 0);                    // nothing has happened in this boot
         });
 
-        await check('readiness: GET /api/ready reports the database and the Network key, and nothing else', async () => {
+        await check('readiness: GET /api/ready requires the database and the docs; the rest degrades, never fails', async () => {
             const r = await t.call('GET', '/api/ready', { token: null });
             assert.strictEqual(r.status, 200, r.text);
             assert.strictEqual(r.json.ready, true, r.text);
-            assert.strictEqual(r.json.status, 'ready', r.text);
             assert.strictEqual(r.json.service, 'services');
-            assert.strictEqual(r.json.checks.db.status, 'ok');
-            assert.strictEqual(r.json.checks.db.required, true);
+            for (const name of ['db', 'docs']) {
+                assert.strictEqual(r.json.checks[name].status, 'ok', name);
+                assert.strictEqual(r.json.checks[name].required, true, name);
+            }
             assert.strictEqual(r.json.checks.network_jwks.status, 'ok');     // the stub Network's key is loaded
+            assert.strictEqual(r.json.checks.network_jwks.required, false);  // docs and tools serve without it
             assert.deepStrictEqual(r.json.failed, []);
-            assert.deepStrictEqual(r.json.skipped, [], 'readiness claims nothing it did not read');
+            // The relay is off in this boot (no EVENTS_URL): reported as degraded, never as ready.
+            assert.ok(r.json.degraded.includes('events_relay'), r.text);
             assert.deepStrictEqual(r.json.authorities, { count: 0, ids: [] });
         });
 
@@ -60,13 +63,18 @@ async function main() {
             assert.strictEqual(under.status, 404);
         });
 
-        await check('an unknown route is a problem+json 404, page or API', async () => {
-            for (const p of ['/api/v1/nope', '/console', '/', '/nope']) {
+        await check('an unknown API route is a problem+json 404; an unknown page is an HTML 404', async () => {
+            for (const p of ['/api/v1/nope', '/api/nope']) {
                 const r = await t.call('GET', p, { token: null });
                 assert.strictEqual(r.status, 404, `${p}: ${r.text}`);
                 assert.match(r.headers.get('content-type') || '', /application\/problem\+json/, p);
                 assert.strictEqual(r.json.code, 'route.not_found', p);
                 assert.ok(r.json.request_id, p);
+            }
+            for (const p of ['/console', '/nope']) {
+                const r = await t.call('GET', p, { token: null });
+                assert.strictEqual(r.status, 404, `${p}: ${r.text.slice(0, 200)}`);
+                assert.match(r.headers.get('content-type') || '', /text\/html/, p);
             }
         });
 

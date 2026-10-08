@@ -1,10 +1,11 @@
 'use strict';
 /**
- * server/authorities/index.js against the REAL pinned openvibe-contracts (v0.110.0): the registry is
+ * server/authorities/index.js against the REAL pinned openvibe-contracts (v0.113.0): the registry is
  * derived from the released service manifests — every non-placeholder service whose manifest lists an
- * active <id>.resource.read — and never hand-maintained. The five authorities of the pin, their manifest
- * loopback origins and their audiences; Services itself (whose manifest now lists
- * services.resource.read), placeholders and services without the capability are not authorities.
+ * active <id>.resource.read — and never hand-maintained. The four authorities of the pin, their manifest
+ * loopback origins and their audiences; Services itself (read in process: server/registry/self-authority.js),
+ * Codes (retired codes.resource.read at 0.113.0, when its portal moved here), placeholders and services without
+ * the capability are not authorities.
  *
  *   node test/authorities.test.js
  */
@@ -17,22 +18,21 @@ const { check, done } = require('./helpers/app');
 const quiet = { warn() {}, log() {}, error() {} };
 
 async function main() {
-    await check('the pin lists six active <id>.resource.read capabilities, five of them authorities', () => {
-        const ids = contracts.capabilities.manifests.filter((c) => /^([a-z][a-z0-9-]{0,31})\.resource\.read$/.test(c.id)).map((c) => c.id).sort();
-        assert.deepStrictEqual(ids, ['codes.resource.read', 'events.resource.read', 'host.resource.read', 'media.resource.read', 'network.resource.read', 'services.resource.read']);
-        for (const id of ids) assert.strictEqual(contracts.capabilities.get(id).status, 'active', id);
+    await check('the pin lists five active <id>.resource.read capabilities, four of them authorities', () => {
+        const ids = contracts.capabilities.manifests.filter((c) => /^([a-z][a-z0-9-]{0,31})\.resource\.read$/.test(c.id) && c.status === 'active').map((c) => c.id).sort();
+        assert.deepStrictEqual(ids, ['events.resource.read', 'host.resource.read', 'media.resource.read', 'network.resource.read', 'services.resource.read']);
+        assert.strictEqual(contracts.capabilities.get('codes.resource.read').status, 'retired', 'Codes owns no resources since 0.113.0');
         // services.resource.read is Services' own id; Services is never its own authority (the next check).
         assert.ok(!createAuthorities(loadConfig({}), { log: quiet }).ids().includes('services'));
     });
 
     await check('the registry is built from those manifests, with the manifest origins and audiences', () => {
         const registry = createAuthorities(loadConfig({}), { log: quiet });
-        assert.deepStrictEqual(registry.ids(), ['codes', 'events', 'host', 'media', 'network']);
+        assert.deepStrictEqual(registry.ids(), ['events', 'host', 'media', 'network']);
         const expected = {
             network: 'http://127.0.0.1:4000',
             media: 'http://127.0.0.1:4100',
             events: 'http://127.0.0.1:4300',
-            codes: 'http://127.0.0.1:4900',
             host: 'http://127.0.0.1:4910',
         };
         for (const [id, origin] of Object.entries(expected)) {
@@ -46,16 +46,16 @@ async function main() {
             assert.strictEqual(a.publicOrigin, contracts.services.get(id).publicOrigin);
         }
         assert.strictEqual(registry.get('nope'), null);
-        assert.strictEqual(registry.size(), 5);
+        assert.strictEqual(registry.size(), 4);
     });
 
     await check('Services, placeholders and services without the capability are not authorities', () => {
         const registry = createAuthorities(loadConfig({}), { log: quiet });
-        for (const id of ['services', 'run', 'actor', 'watch', 'actor-console', 'sites']) {
+        for (const id of ['services', 'codes', 'run', 'actor', 'watch', 'actor-console', 'sites']) {
             if (!contracts.services.get(id)) continue;
             assert.strictEqual(registry.get(id), null, `${id} must not be an authority`);
         }
-        // Services' own manifest is a placeholder today; even a live one would never index itself.
+        // Services' own resources are read in process (server/registry/self-authority.js), never over HTTP.
         assert.ok(!registry.ids().includes('services'));
     });
 
@@ -63,7 +63,7 @@ async function main() {
         const registry = createAuthorities(loadConfig({ SERVICES_MEDIA_URL: 'http://127.0.0.1:4999', SERVICES_RUN_URL: 'http://127.0.0.1:4888' }), { log: quiet });
         assert.strictEqual(registry.get('media').internalOrigin, 'http://127.0.0.1:4999');
         assert.strictEqual(registry.get('run'), null, 'an override for a service without the capability changes nothing');
-        assert.deepStrictEqual(registry.ids(), ['codes', 'events', 'host', 'media', 'network']);
+        assert.deepStrictEqual(registry.ids(), ['events', 'host', 'media', 'network']);
     });
 
     await check('every registry entry satisfies the rule the registry claims', () => {

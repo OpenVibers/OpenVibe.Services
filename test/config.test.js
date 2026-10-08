@@ -28,6 +28,8 @@ async function main() {
         assert.strictEqual(c.events.enabled, true);
         assert.strictEqual(c.events.url, '');
         assert.strictEqual(c.db.url, '');
+        assert.strictEqual(c.oauth.redirectUri, 'http://localhost:4930/auth/callback');
+        assert.strictEqual(c.service, 'services');
     });
 
     await check('the environment overrides every default', () => {
@@ -35,7 +37,8 @@ async function main() {
             NODE_ENV: 'production', PORT: '5000', HOST: '0.0.0.0', BASE_URL: 'https://openvibe.services/',
             DATABASE_URL: 'postgres://runtime', DATABASE_DIRECT_URL: 'postgres://owner',
             OV_NETWORK_URL: 'https://network.example/', OV_NETWORK_INTERNAL_URL: 'http://127.0.0.1:4001/',
-            OV_NETWORK_ISSUER: 'https://issuer.example', OV_NETWORK_PUBLIC_KEY: '-----BEGIN\\nKEY-----',
+            OV_NETWORK_ISSUER: 'https://issuer.example', SERVICES_FORM_SECRET: 'form', SERVICES_STAFF_SUBJECTS: 'usr_A, usr_B',
+            SERVICES_PLAYGROUND_EVENTS_URL: 'http://127.0.0.1:4301', SERVICES_EXPORT_MEDIA_URL: 'http://127.0.0.1:4101',
             OV_OAUTH_CLIENT_ID: 'svc', OV_OAUTH_CLIENT_SECRET: 'secret',
             SERVICES_INDEX_PAGE_SIZE: '2', SERVICES_INDEX_CONCURRENCY: '1', SERVICES_INDEX_TIMEOUT_MS: '250',
             SERVICES_INDEX_DEFAULT_LIMIT: '10', SERVICES_INDEX_MAX_LIMIT: '20', SERVICES_NETWORK_TIMEOUT_MS: '750',
@@ -49,7 +52,12 @@ async function main() {
         assert.strictEqual(c.network.url, 'https://network.example');
         assert.strictEqual(c.network.internalUrl, 'http://127.0.0.1:4001');
         assert.strictEqual(c.network.issuer, 'https://issuer.example');
-        assert.strictEqual(c.network.publicKey, '-----BEGIN\nKEY-----');        // \n escaped in the env
+        assert.strictEqual(c.formSecret, 'form');
+        assert.deepStrictEqual(c.staffSubjects, ['usr_A', 'usr_B']);
+        assert.strictEqual(c.playground.eventsUrl, 'http://127.0.0.1:4301');
+        assert.strictEqual(c.export.mediaUrl, 'http://127.0.0.1:4101');
+        // The console's own *_URL settings name no authority.
+        assert.ok(!('playground-events' in c.authorityOrigins) && !('export-media' in c.authorityOrigins), JSON.stringify(c.authorityOrigins));
         assert.strictEqual(c.oauth.clientSecret, 'secret');
         assert.deepStrictEqual(c.index, { pageSize: 2, concurrency: 1, timeoutMs: 250, defaultLimit: 10, maxLimit: 20, networkTimeoutMs: 750 });
         assert.deepStrictEqual(c.authorityOrigins, { media: 'http://127.0.0.1:4999', network: 'http://127.0.0.1:4010' });

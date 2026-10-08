@@ -3,27 +3,48 @@
   "stage": "alpha",
   "code": true,
   "wave": "W13",
-  "plan": "OpenVibe Updated Plan Based On Codebase (plan T13, ADR-048)",
+  "plan": "OpenVibe Updated Plan Based On Codebase (plan T13, ADR-048; the developer portal of ADR-014 moved here from OpenVibe.Codes on 2026-10-08)",
   "runtime": "node 22, express 4, PostgreSQL 18 (openvibe-sdk/db)",
   "port": 4930,
   "domain": "openvibe.services",
-  "contracts": "openvibe-contracts v0.112.0",
-  "sdk": "openvibe-sdk v0.35.0",
-  "shared": "openvibe-shared v2.13.2",
+  "contracts": "openvibe-contracts v0.113.0",
+  "sdk": "openvibe-sdk v0.35.1",
+  "shared": "openvibe-shared v2.13.3",
   "packages": [
-    "openvibe-contracts v0.110.0",
-    "openvibe-sdk v0.34.0",
-    "openvibe-shared v2.12.0"
+    "openvibe-contracts v0.113.0",
+    "openvibe-sdk v0.35.1",
+    "openvibe-shared v2.13.3"
   ],
   "capabilities": [
-    "services.resource.read"
+    "services.resource.read",
+    "services.release.read",
+    "services.release.manage"
   ],
   "capabilitiesRegistered": true,
-  "capabilitiesNote": "services.resource.read is registered in the pinned openvibe-contracts (status active, visibility first-party): contracts' manifest and grant rules decide it and an id contracts does not know is refused, never allowed. The later services.resource.control, services.recipe.run, services.usage.read and services.cost.read arrive with their plan T13 steps.",
-  "events": [],
-  "deployed": false,
-  "deployment": "Not deployed: openvibe.services has no DNS, no ovhost inventory entry, no ov_services database and no /etc/openvibe/services.env yet. The release is deploy/ (nginx vhost deploy/nginx/openvibe.services.conf, unit deploy/systemd/openvibe-services.service, WorkingDirectory /opt/openvibe.services, EnvironmentFile /etc/openvibe/services.env, PORT 4930). The vhost proxies /api/health, /api/ready, /release.json and /api/, takes the client address from $remote_addr only (never appending X-Forwarded-For), and refuses /internal/ and /metrics at the edge; the app refuses a proxied /metrics caller itself. The first deploy needs Services' Network client (OV_OAUTH_CLIENT_ID=services with its secret) granted every authority's <id>.resource.read scope, or the fan-out reports every authority partial.",
+  "capabilitiesNote": "All three are registered in the pinned openvibe-contracts v0.113.0: services.resource.read (first-party, the merged index), services.release.read (public) and services.release.manage (an app managing its own releases). They replaced codes.resource.read and codes.release.read|manage when the portal moved here. The later services.resource.control, services.recipe.run, services.usage.read and services.cost.read arrive with their plan T13 steps.",
+  "events": [
+    "services.app.published",
+    "services.app.deprecated",
+    "services.app.revoked",
+    "services.moderation.action"
+  ],
+  "deployed": true,
+  "deployment": "openvibe-ovh: unit openvibe-services.service on 127.0.0.1:4930 (git-checkout /opt/openvibe.services, env /etc/openvibe/services.env, database ov_services), nginx deploy/nginx/openvibe.services.conf serving https://openvibe.services (the Sites placeholder left on 2026-10-08).",
   "features": [
+    "developer portal over Network's projects, apps, credentials, grants, quotas and audit",
+    "per-project usage page from Network's rollups",
+    "project export (JSON) and full archive (zip)",
+    "secrets shown once, never stored or logged",
+    "scope editor offering only grantable capabilities",
+    "docs generated from the pinned contracts and SDK",
+    "OAuth helper and webhook tester (signature v2)",
+    "grant-respecting Media and Events playgrounds",
+    "app and mod manifest validation and release metadata with services.app.* events",
+    "ADR-013 trust tiers",
+    "policy and governance pages (governance drafts pending owner review)",
+    "per-actor limits (openvibe-sdk/limits)",
+    "Services' own manifests and releases (services.manifest, services.release) in the merged index, read in process, with OVRN reads",
+    "crawl artifacts (robots.txt, sitemap.xml, llms.txt, llms-full.txt) and the home page's JSON-LD",
     "the authority registry (server/authorities/index.js): built at boot from the pinned openvibe-contracts service manifests — every non-placeholder service whose manifest lists an active <id>.resource.read is an authority (at v0.110.0: network, events, host, codes, media), with its manifest internalOrigin (SERVICES_<ID>_URL overrides) and audience openvibe.<id>; Services itself is never an authority",
     "one adapter per authority (server/authorities/adapter.js): GET /api/v1/resources and GET /api/v1/resources/:ovrn over that authority's loopback origin with a Network client-credentials token for its audience, scoped to its resource.read capability and cached (one mint per authority, refreshed 60 s before expiry; server/authorities/tokens.js)",
     "the merged resource index (server/resources.js, GET /api/v1/resources?project=&kind=&service=&cursor=&limit=): openvibe-sdk/resources' createResourceIndex fans out and merges every authority's pages (per-authority cursor walk, concurrency 4, per-authority timeout), Services adds a deterministic (service, ovrn, id) total order and an opaque keyset cursor, and filters project/kind/service locally so a scoped read never shows a row outside its scope",
@@ -35,6 +56,11 @@
     "migrations/0001_initial.sql: Services' own rows only (services_authorities, services_resources, services_catalog_entries, services_recipes, services_recipe_runs, services_control_log, services_events_outbox) — Services never writes another service's database (ADR-048)"
   ],
   "notYet": [
+    "The playgrounds have never been used on production (0 playground runs); the one production end-to-end run used curl, and it is not a committed, repeatable check",
+    "Usage counts come from the services' hourly *.usage.recorded rollups (Network adds them up per day; the current hour is not counted) and cost lives in Billing, not on the usage page; no trace or error dashboards beyond the sampled failures",
+    "Billing sandbox, Chat bot and Realtime playgrounds; CLI and scaffolding; templates",
+    "Consent screen for third-party production apps (a Network gap)",
+    "Governance material (code of conduct, contribution guide, contributor ladder, moderation policy) is written as drafts pending owner review: not in effect, not indexed",
     "plan T13 step 4 done in OpenVibe.Contracts v0.110.0 (services.resource.read is registered, active and first-party), step 5 done in Network, step 7 (read model + ingestion), steps 9-15 (console, control operations, recipes, usage, deploy)"
   ],
   "updated": "2026-10-08"
