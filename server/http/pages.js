@@ -62,13 +62,15 @@ const ov = createClient({
     }),
 });
 const services = await ov.registry.services();`;
-        // The services a project can call: every live service whose manifest lists a capability an app can be
-        // granted, linked to its generated API reference. Read from the pinned contracts, never typed here.
+        // The services a project can call: every live service with a generated API reference and at least one
+        // capability an app can be granted (Services itself aside), with its tagline from its site block or its
+        // product manifest. Read from the pinned contracts, never typed here.
         const apiDocs = new Set(contracts.openapi.index().map((x) => x.service));
+        const productTagline = new Map(contracts.products.catalog().filter((p) => p.relationships && p.relationships.service && p.tagline).map((p) => [p.relationships.service, p.tagline]));
+        const grantable = (m) => (m.capabilities || []).some((c) => { const cap = contracts.capabilities.get(c); return cap && cap.status === 'active' && cap.visibility === 'public'; });
         const programmable = contracts.services.manifests
-            .filter((m) => m && m.site && m.exposure && m.exposure.state === 'live' && m.exposure.publicSite === 'service')
-            .filter((m) => (m.capabilities || []).some((c) => { const cap = contracts.capabilities.get(c); return cap && cap.status === 'active' && cap.visibility === 'public'; }))
-            .sort((a, b) => (a.site.position ?? 99) - (b.site.position ?? 99));
+            .filter((m) => m && m.id !== 'services' && m.exposure && m.exposure.state === 'live' && apiDocs.has(m.id) && grantable(m))
+            .sort((a, b) => ((a.site && a.site.position) ?? 50) - ((b.site && b.site.position) ?? 50) || a.name.localeCompare(b.name));
         page(req, res, {
             index: true, cache: PUBLIC_CACHE,
             jsonLd: homeJsonLd(config),
@@ -97,8 +99,8 @@ ${programmable.length ? raw(showcase.features({
                 id: 'services', title: 'Services you can build on', lede: 'Each one runs in production today; its API reference is generated from the capabilities it declares.',
                 // Text only: an inline icon per service would double the page's weight (the home page's budget).
                 items: programmable.map((m) => ({
-                    title: m.name, text: m.site.tagline || '',
-                    href: apiDocs.has(m.id) ? `/docs/api/${m.id}` : m.publicOrigin,
+                    title: m.name, text: (m.site && m.site.tagline) || productTagline.get(m.id) || '',
+                    href: `/docs/api/${m.id}`,
                 })),
             })) : ''}
 ${raw(showcase.steps({
