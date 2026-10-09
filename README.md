@@ -102,7 +102,7 @@ There is no polling loop: the index reads the authorities on each request (step 
 - **OpenVibe.Events** — the outbox relay publishes `services.app.*` with Services' service token (`events.event.publish`); the Events playground calls it with the app's token (`events.app.publish`); the project archive pulls the project's app events with a Network export token (`events.app.read`).
 - **OpenVibe.Media** — the Media playground uploads with the app's token into the project's namespace; the project archive lists the project's objects, namespaces and download URLs with a Network export token (`media.object.list`, `media.object.read`).
 - **PostgreSQL 18 and Valkey 9** (OpenVibe.Host `roles/data/`, ADR-035): every read and write is async through `openvibe-sdk/db`; Valkey holds the per-actor limit counters (optional).
-- **openvibe-contracts v0.122.1**, **openvibe-sdk v0.35.1**, **openvibe-shared v2.20.0** (pinned tag tarballs; the docs show the tag and the package version, and say so when they differ).
+- **openvibe-contracts v0.126.0**, **openvibe-sdk v0.35.1**, **openvibe-shared v2.20.0** (pinned tag tarballs; the docs show the tag and the package version, and say so when they differ).
 
 No path in Services sends or accepts a shared loopback key (tested by grep and at runtime).
 
@@ -144,7 +144,7 @@ one receipt per export and deletion in `account_data_events` (migration 0003).
   - The resource index's owner becomes NULL.
   - The append-only release log, the control log and the staff trust tiers stay attributed, for accountability.
 
-The Services service manifest, `services.release.manage|read`, `services.resource.read` and `services.app-manifest@1` are released in openvibe-contracts v0.122.1 (they replaced the `codes.*` forms, retired that release); the CI contracts check is blocking.
+The Services service manifest, `services.release.manage|read`, `services.resource.read` and `services.app-manifest@1` are released in openvibe-contracts v0.126.0 (they replaced the `codes.*` forms, retired that release); the CI contracts check is blocking.
 
 For the playgrounds to succeed end to end (not Services' code; configuration elsewhere): Network `DEV_SANDBOX_AUDIENCES` including `openvibe.media` and `openvibe.events`, a staff-set allowance containing `media.object.upload` and `events.app.publish` for the project, a Media tenant keyed by the project id, and OpenVibe.Events serving `events.app.publish` for app tokens. On 2026-09-23 these were in place on production: a sandbox app uploaded to Media (tenant `prj_…-sandbox`) and published and read app events through public endpoints. That run used curl, not the playgrounds, and it is not yet a committed, repeatable check.
 
@@ -251,7 +251,7 @@ Reporting a vulnerability: [SECURITY.md](SECURITY.md).
 Part of the [OpenVibe network](https://openvibe.network). Built in the open by [OpenVibers](https://github.com/OpenVibers).
 
 <!-- versions:start -->
-- openvibe-contracts: v0.122.1
+- openvibe-contracts: v0.126.0
 - openvibe-sdk: v0.37.0
 - openvibe-shared: v2.20.0
 <!-- versions:end -->
