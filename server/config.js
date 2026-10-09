@@ -145,6 +145,10 @@ function loadConfig(env = process.env) {
             enabled: bool(env.SERVICES_EVENTS_ENABLED, true),
             url: trim(env.EVENTS_URL || ''),
             intervalMs: Math.max(50, int(env.EVENTS_RELAY_INTERVAL_MS, 2000)),
+            // OpenVibe.Events → Services (ADR-033 account export and deletion, server/domain/account-data.js): the
+            // secret(s) that sign a delivery to POST /internal/events (comma-separated for rotation, 32+ characters each).
+            // Unset: the route answers 503 and no subscription is created at boot.
+            secrets: String(env.SERVICES_EVENTS_SECRET || '').split(',').map((x) => x.trim()).filter(Boolean),
         },
 
         // IndexNow (openvibe-shared/indexnow): a key makes search engines recrawl a page the moment a

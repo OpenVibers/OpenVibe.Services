@@ -125,6 +125,24 @@ In Network (`server/identity/principals.js` / `server/db/database.js`, as for co
 
 - OAuth client `services`, name `OpenVibe.Services`, redirect URI `https://openvibe.services/auth/callback`.
 - Service grant `['services', 'events.event.publish', 'openvibe.events', []]` (the outbox relay).
+- Account export and deletion (ADR-033): `['services', 'events.subscription.manage', 'openvibe.events', []]` (the two
+  account subscriptions, created at boot), then, last and once the release is live,
+  `network.account.export.contribute` and `network.account.deletion.confirm` for audience `openvibe.network`.
+
+### Account export and deletion (ADR-033)
+
+`network.account.export_requested` and `network.account.deleted` arrive at `POST /internal/events`. The route is
+loopback-only (nginx answers 404 for `/internal/`, and the handler refuses a forwarded request) and signed with
+`SERVICES_EVENTS_SECRET`. They are answered by `server/domain/account-data.js` over `openvibe-sdk/account-data`, with
+one receipt per export and deletion in `account_data_events` (migration 0003).
+
+- **Export:** the playground and recipe runs the person started, and the manifests and releases they created.
+- **Deletion:**
+  - Their runs are deleted.
+  - Manifests and releases belong to their project and stay: `created_by` becomes `deleted` and the publisher,
+    deprecator and reviser become NULL.
+  - The resource index's owner becomes NULL.
+  - The append-only release log, the control log and the staff trust tiers stay attributed, for accountability.
 
 The Services service manifest, `services.release.manage|read`, `services.resource.read` and `services.app-manifest@1` are released in openvibe-contracts v0.114.0 (they replaced the `codes.*` forms, retired that release); the CI contracts check is blocking.
 
