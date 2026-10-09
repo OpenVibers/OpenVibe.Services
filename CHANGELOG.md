@@ -4,6 +4,12 @@ Notable changes to OpenVibe.Services. The service is unreleased; everything belo
 
 ## Unreleased
 
+- Account export and deletion (ADR-033): `POST /internal/events` (loopback, `SERVICES_EVENTS_SECRET`) answers network.account.export_requested and network.account.deleted through `server/domain/account-data.js` over `openvibe-sdk/account-data` (SDK v0.37.0, was v0.35.1).
+  - **Deleted:** the person's playground and recipe runs.
+  - **Authorless:** manifests and releases stay with their project, without the person.
+  - **Kept:** the audit logs and staff trust tiers.
+  - The two subscriptions are created at boot. Migration `0003_account_data.sql`, `test/account-data.test.js`.
+
 ### Changed
 
 - **The developer portal moved here from OpenVibe.Codes** (owner decision 2026-10-08; Codes became the open coding-agent

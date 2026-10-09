@@ -58,6 +58,8 @@ const { assetVersion, send } = require('./render/layout');
 const { html } = require('./render/html');
 const { ServiceError } = require('./util');
 
+const accountDataLib = require('./domain/account-data');
+const { createNetworkSender } = require('openvibe-sdk/account-data');
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const VERSION = require('../package.json').version;
 // The resource index takes query strings; nothing there uploads.
@@ -147,6 +149,16 @@ async function createApp(opts = {}) {
         referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     }));
     app.use(cookieParser());
+
+    // ── OpenVibe.Events → Services (loopback only: nginx answers 404 for /internal/) ──
+    // network.account.export_requested and network.account.deleted (ADR-033), answered by openvibe-sdk/account-data's
+    // consumer over domain/account-data.js. It reads the raw body itself (the v2 signature covers it) and refuses a
+    // request that came through a proxy. The sender posts to Network's internal routes with Services' own token.
+    ctx.accountData = accountDataLib.create({ db: store.db, log });
+    ctx.accountSend = opts.accountSend || (config.oauth.clientSecret
+        ? createNetworkSender({ networkInternalUrl: config.network.internalUrl, clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret, fetch: fetchImpl || globalThis.fetch })
+        : async () => { throw new Error('OV_OAUTH_CLIENT_SECRET is not set: Services cannot answer account events'); });
+    app.post('/internal/events', ctx.accountData.consumer({ secrets: config.events.secrets, send: ctx.accountSend, log }));
 
     // ── Machine endpoints ───────────────────────────────────
     // Liveness: the process answers. What it can and cannot do is /api/ready's job.

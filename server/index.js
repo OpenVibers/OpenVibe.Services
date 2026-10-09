@@ -18,6 +18,7 @@ const { loadConfig } = require('./config');
 const { openDb, migrate, createStore } = require('./db');
 const { createApp } = require('./app');
 const { gracefulStop } = require('openvibe-sdk/service');
+const { startSubscriptions } = require('openvibe-sdk/account-data');
 const { createRegistry } = require('openvibe-shared/metrics');
 
 /**
@@ -25,10 +26,10 @@ const { createRegistry } = require('openvibe-shared/metrics');
  * and the outbox relay stop and the store closes; past the deadline the process exits 0. Exported so a test can
  * inject `exit` and `signals: false`.
  */
-function createLifecycle({ server, ctx, exit, signals }) {
+function createLifecycle({ server, ctx, exit, signals, extra = [] }) {
     return gracefulStop({
         name: 'Services', server, drainMs: 4000, deadlineMs: 5000, deadlineExitCode: 0, exit, signals,
-        stop: [() => ctx.keys.client.stop(), () => ctx.outbox.stop()],
+        stop: [() => ctx.keys.client.stop(), () => ctx.outbox.stop(), ...extra],
         close: [() => ctx.store.close().catch(() => {})],
     });
 }
@@ -55,7 +56,13 @@ async function main() {
     // good keys through outages, exponential backoff, unknown-kid floods throttled, an unref'd timer.
     keys.client.start();
 
-    const { stop: shutdown } = createLifecycle({ server, ctx });
+    // The two account subscriptions at OpenVibe.Events (ADR-033), created when missing; off without EVENTS_URL,
+    // SERVICES_EVENTS_SECRET or the client secret.
+    const subscriptions = startSubscriptions({
+        eventsUrl: config.events.url, endpoint: `http://127.0.0.1:${config.port}/internal/events`, secret: config.events.secrets[0],
+        networkInternalUrl: config.network.internalUrl, clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret,
+    });
+    const { stop: shutdown } = createLifecycle({ server, ctx, extra: [() => { if (subscriptions) subscriptions.stop(); }] });
     return { app, server, ctx, shutdown };
 }
 
