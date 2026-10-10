@@ -123,7 +123,7 @@ ${table(['Project', 'Your role', 'Environments', 'Apps', 'Created'], list.map((p
                 html`<a href="/projects/${p.id}">${p.name}</a><br><code class="small">${p.id}</code>${p.archived_at ? html` ${badge('archived', 'bad')}` : ''}`,
                 p.role || (req.viewer.staff ? 'staff' : '—'), (p.environments || []).join(', '), p.counts ? p.counts.apps : '—', time(p.created_at),
             ]), { empty: 'You are not a member of any project yet.' })}
-<p><a href="/projects/mine">Your resources</a> <span class="muted small">what you own outside any project: robots, chat rooms, streams, watches, Actor tasks</span></p>
+<p><a href="/projects/mine">Your resources</a> <span class="muted small">what you own outside any project: robots, chat rooms, streams, watches, Actor tasks, pastes</span></p>
 <h2>Create a project</h2>
 <form method="post" action="/projects" class="inline-form">${csrfField(csrf(req))}
 <label>Name <input name="name" required maxlength="80"></label><button type="submit">Create</button></form>
@@ -150,8 +150,8 @@ ${table(['Project', 'Your role', 'Environments', 'Apps', 'Created'], list.map((p
             scope: { owner: req.viewer.subject }, base: '/projects/mine',
             title: 'Your resources', crumbs: [{ label: 'Projects', href: '/projects' }, { label: 'Your resources' }],
             heading: html`<h1>Your resources</h1>`,
-            intro: 'What you own yourself, outside any project: your robots, chat rooms, streams, watches, Actor tasks and the rest. Each OpenVibe service answers for its own, read just now and merged here; the service that holds each one owns it.',
-            empty: 'Nothing of yours outside a project yet. A robot you add on OpenVibe.Bot, a room you open on OpenVibe.Chat, a stream on OpenRestream or a watch on OpenVibe.Watch appears here.',
+            intro: 'What you own yourself, outside any project: your robots, chat rooms, streams, watches, Actor tasks, pastes, forum spaces and the rest. Each OpenVibe service answers for its own, read just now and merged here; the service that holds each one owns it.',
+            empty: 'Nothing of yours outside a project yet. A robot you add on OpenVibe.Bot, a room you open on OpenVibe.Chat, a stream on OpenRestream, a watch on OpenVibe.Watch or a paste on OpenVibe.Community appears here.',
             footer: html`Resources in a project are on that project's page: <a href="/projects">your projects</a>.`,
             ownerColumn: false,
         });
