@@ -15,7 +15,7 @@
  *             sub app:app_<project ULID>, read-only caps, purpose export), recorded in exportTokens.
  *   Events    POST /api/v1/events: verifies the app token (openvibe-contracts), needs the capability;
  *             GET /api/v1/events (pull, events.app.read): the token's project and env only, paged
- *             like Events (next_after_seq, latest_seq); addAppEvent() seeds it
+ *             like Events (opaque cursors: after=, next_cursor, latest_cursor); addAppEvent() seeds it
  *   Media     POST /api/v1/:app/files: verifies the token, capability and namespace;
  *             GET /api/v2/:project/(objects|objects/:id/download|namespaces) for app-shaped tokens
  *             of that project, the token's env picking the tenant; addObject() seeds it
@@ -347,7 +347,7 @@ const problemJson = (json, status, code, detail) => json(status, { type: `https:
 /**
  * Events: POST /api/v1/events with an app or service token carrying events.event.publish; GET
  * /api/v1/events pulls an app token's own project and environment (events.app.read, topic
- * app.<project_key>.* only), with Events' paging: next_after_seq moves to latest_seq at the end.
+ * app.<project_key>.* only), with Events' paging: next_cursor moves to the head (latest_cursor) at the end.
  */
 async function startEvents(network) {
     const published = [];
@@ -368,10 +368,15 @@ async function startEvents(network) {
             if (!v.claims.cap.includes('events.app.read')) return problemJson(json, 403, 'capability.denied', 'events.app.read not granted');
             const key = `p${v.claims.project_id.replace(/^prj_/, '').toLowerCase()}`;
             if (url.searchParams.get('topic') !== `app.${key}.*`) return problemJson(json, 403, 'events.topic_not_allowed', `app.* patterns must name your project: app.${key}.*`);
-            const after = Number(url.searchParams.get('after_seq') || 0);
+            // Opaque cursors as Events makes them (c1.<epoch>.<base64url(seq)>); the archive never parses one.
+            const enc = (n) => `c1.0.${Buffer.from(String(n), 'utf8').toString('base64url')}`;
+            const given = url.searchParams.get('after');
+            const after = given ? Number(Buffer.from(String(given).replace(/^c1\.0\./, ''), 'base64url').toString('utf8')) : Number(url.searchParams.get('after_seq') || 0);
+            if (!Number.isFinite(after)) return problemJson(json, 400, 'events.bad_request', 'after must be an opaque cursor');
             const limit = Math.min(1000, Number(url.searchParams.get('limit') || 100));
             const rows = stored.filter((r) => r.seq > after && r.project_id === v.claims.project_id && r.env === v.claims.env).slice(0, limit);
-            return json(200, { events: rows.map((r) => ({ seq: r.seq, event: r.event })), next_after_seq: rows.length === limit ? rows[rows.length - 1].seq : seq, latest_seq: seq });
+            const next = rows.length === limit ? rows[rows.length - 1].seq : seq;
+            return json(200, { events: rows.map((r) => ({ seq: r.seq, cursor: enc(r.seq), event: r.event })), next_after_seq: next, next_cursor: enc(next), latest_seq: seq, latest_cursor: enc(seq) });
         }
         if (req.url === '/api/v1/events' && req.method === 'POST') {
             const v = verify(req);

@@ -15,7 +15,7 @@
  *   media/<env>/objects.jsonl    every object Media holds for the project (soft-deleted ones too),
  *                                with `download`: its public URL, or a signed URL valid urlTtlS
  *   events/<env>.jsonl           the project's app events (app.<project_key>.*) Events still keeps,
- *                                one { seq, event } per line
+ *                                one { seq, cursor, event } per line, read by Events' opaque cursor
  *
  * Objects are listed with download URLs rather than copied into the zip: a project may hold a GiB
  * or more, and Services stays out of the byte path. Media signs private and sandbox URLs for at most
@@ -162,19 +162,21 @@ function createArchiver({ config, fetchImpl, log = console }) {
     async function eventsPart(project, env, token) {
         const topic = `app.${projectKey(project.id)}.*`;
         const events = [];
-        let after = 0;
-        let end = null;
+        let after = null;          // Events' opaque cursor (ADR-042 decision 7): none = from the oldest retained event
+        let end = null;            // the head when the export started: events published during it are left out
         let gap = null;
         let pages = 0;
         let stopped = false;
         for (;;) {
-            const page = await get('events', 'events', env, token, '/api/v1/events', { topic, after_seq: after, limit: EVENT_PAGE });
-            if (end === null) end = Number(page.latest_seq) || 0;
+            const page = await get('events', 'events', env, token, '/api/v1/events', { topic, ...(after ? { after } : {}), limit: EVENT_PAGE });
+            if (end === null) end = page.latest_cursor || null;
             if (page.gap && !gap) gap = page.gap;
-            events.push(...(page.events || []));
-            const next = Number(page.next_after_seq);
+            const got = page.events || [];
+            events.push(...got);
             if (events.length > opts.maxEvents) { stopped = true; break; }
-            if (!(next > after) || next >= end) break;
+            const next = page.next_cursor || null;
+            // A short page, a cursor that did not move, or the head the export started at: done.
+            if (!next || next === after || next === end || got.length < EVENT_PAGE) break;
             if (++pages >= MAX_EVENT_PAGES) { stopped = true; break; }
             after = next;
         }
@@ -184,7 +186,7 @@ function createArchiver({ config, fetchImpl, log = console }) {
             summary: {
                 count: events.length, complete: !stopped, limit: opts.maxEvents, topic,
                 first_seq: events.length ? events[0].seq : null, last_seq: events.length ? events[events.length - 1].seq : null,
-                ...(stopped ? { next_after_seq: events.length ? events[events.length - 1].seq : after, note: `stopped at ${opts.maxEvents} events (SERVICES_EXPORT_MAX_EVENTS); pull the rest from Events with after_seq=next_after_seq` } : {}),
+                ...(stopped ? { next_cursor: events.length ? events[events.length - 1].cursor || after : after, note: `stopped at ${opts.maxEvents} events (SERVICES_EXPORT_MAX_EVENTS); pull the rest from Events with after=next_cursor` } : {}),
                 retention: `Events keeps app events for a limited time (production 30 days, sandbox 7 by default); older ones are gone${gap ? ` (the oldest kept is seq ${gap.to_seq + 1})` : ''}.`,
             },
         };
