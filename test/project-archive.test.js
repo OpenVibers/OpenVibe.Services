@@ -133,6 +133,8 @@ const { boot, check, done } = require('./helpers/boot');
         assert.deepStrictEqual(prod[5].event, E.production[5].event, 'the envelope as Events keeps it');
         const pulls = t.events.requests.filter((q) => q.method === 'GET' && q.path.startsWith('/api/v1/events'));
         assert.ok(pulls.length >= 3, 'production took more than one page');
+        assert.ok(pulls.every((q) => !/[?&]after_seq=/.test(q.path)), 'paged by opaque cursor, never a numeric position');
+        assert.ok(pulls.some((q) => /[?&]after=c1\./.test(q.path)), 'the second page asked after= the first page\'s next_cursor');
     });
 
     await check('Network minted the tokens for the owner, one per service and environment; Media and Events saw only those', async () => {
@@ -244,7 +246,9 @@ const { boot, check, done } = require('./helpers/boot');
             assert.strictEqual(o.next_cursor, listed[3].id, 'continue from the last one listed');
             assert.strictEqual(m.parts.media.sandbox.objects.complete, true, 'the sandbox has 3: under the limit');
             const ev = m.parts.events.production;
-            assert.deepStrictEqual([ev.count, ev.complete, ev.next_after_seq], [1000, false, E.production[999].seq]);
+            assert.deepStrictEqual([ev.count, ev.complete], [1000, false]);
+            assert.strictEqual(ev.next_cursor, lines(z.get('events/production.jsonl'))[999].cursor, 'continue from the last event exported, by cursor');
+            assert.ok(!('next_after_seq' in ev));
             assert.strictEqual(lines(z.get('events/production.jsonl')).length, 1000);
             assert.strictEqual(m.parts.events.sandbox.complete, true);
             assert.match(z.get('README.txt').toString(), /NOT COMPLETE/);
