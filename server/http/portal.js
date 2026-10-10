@@ -4,7 +4,8 @@
  * The signed-in portal: projects, members, apps, credentials, grants, quotas, usage and audit — all over
  * OpenVibe.Network's /api/v1/projects API with the person's own access token (ADR-014: Network owns
  * every one of these; Services stores none of them). Plus the Services-owned parts that hang off an app:
- * releases (manifest editor, publish/deprecate/revoke) and playgrounds.
+ * releases (manifest editor, publish/deprecate/revoke) and playgrounds. And the project's resources: the
+ * merged index (ADR-048) as GET /api/v1/resources serves it to a member, one table over every authority.
  *
  * Honesty rules:
  *   - a Network failure is shown as Network answered it (HTTP status, problem code, detail, request
@@ -16,6 +17,8 @@
  *     shown with its lag; Services computes nothing of its own
  *   - the scope editor offers only capabilities apps can be granted (public, or partner when in the
  *     allowance) and refuses to forward anything else
+ *   - resources are what each authority answered just now; an authority that could not be read is named
+ *     on the page with the problem it gave, never left out silently
  */
 const express = require('express');
 const { asyncRouter } = require('./router');
@@ -31,6 +34,8 @@ const { buildExport } = require('../domain/project-export');
 const { ArchiveError } = require('../domain/project-archive');
 const { statusBadge } = require('./pages');
 const { usageBody, usageQuery } = require('../render/usage');
+const { listQuery } = require('../api/v1');
+const { ServiceError } = require('../util');
 
 const PRJ_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
 const APP_RE = /^app_[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -38,6 +43,15 @@ const CRD_RE = /^crd_[0-9A-HJKMNP-TV-Z]{26}$/;
 const USR_RE = /^usr_[0-9A-HJKMNP-TV-Z]{26}$/;
 const CAP_RE = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+){2,}$/;
 const REL_RE = /^rel_[0-9A-HJKMNP-TV-Z]{26}$/;
+const RESOURCES_PER_PAGE = 50;
+
+/** A resource's state as a badge. States are each service's own words; the common ones get a colour. */
+const STATE_KIND = {
+    ready: 'ok', active: 'ok', published: 'ok', live: 'ok', enabled: 'ok', online: 'ok', open: 'ok',
+    draft: 'warn', queued: 'warn', pending: 'warn', paused: 'warn', processing: 'warn', deprecated: 'warn', offline: 'warn',
+    failed: 'bad', revoked: 'bad', deleted: 'bad', disabled: 'bad', archived: 'bad', suspended: 'bad',
+};
+const stateBadge = (s) => badge(s, STATE_KIND[s] || '');
 
 const atLeast = (role, need) => Boolean(role) && RANK[role] >= RANK[need];
 
@@ -150,7 +164,7 @@ ${archived ? notice('This project is archived: every app in it is revoked.', 'ba
 <dt>Environments</dt><dd>${envs.join(', ')}${project.environment_policy === 'sandbox' ? html` <span class="muted small">(production apps need staff to enable production for this project)</span>` : ''}</dd>
 <dt>Allowance</dt><dd>${(project.allowance || []).length ? html`<ul class="plain">${project.allowance.map((id) => html`<li><a href="/docs/capabilities/${id}"><code>${id}</code></a></li>`)}</ul>` : html`<span class="muted">empty: staff decide which capabilities this project's apps may hold</span>`}</dd>
 <dt>Created</dt><dd>${time(project.created_at)}</dd></dl>
-${atLeast(role, 'admin') || req.viewer.staff ? html`<p><a href="/projects/${project.id}/usage">Usage, quotas and errors</a> · <a href="/projects/${project.id}/audit">Audit log</a></p>` : ''}
+<p><a href="/projects/${project.id}/resources">Resources</a>${atLeast(role, 'admin') || req.viewer.staff ? html` · <a href="/projects/${project.id}/usage">Usage, quotas and errors</a> · <a href="/projects/${project.id}/audit">Audit log</a>` : ''}</p>
 
 <h2>Apps</h2>
 ${apps.ok ? table(['App', 'Environment', 'Type', 'Grants', 'Created'], (apps.data.apps || []).map((a) => [
@@ -322,6 +336,61 @@ ${table(['When', 'Actor', 'Action', 'Target', 'Detail', 'Event'], (got.data.entr
             ]))}
 ${got.data.next_before ? html`<p><a href="/projects/${project.id}/audit?before=${got.data.next_before}">Older</a></p>` : ''}`,
         });
+    });
+
+    // ── Resources (ADR-048, plan T13): the merged index, as the API serves it to a member ──
+    // Network decides membership (loadProject) before any authority is asked; the index then reads every
+    // authority for this project only and keeps the page to it (server/resources.js).
+    r.get('/:project/resources', idParams, async (req, res) => {
+        const project = await loadProject(req, res);
+        if (!project) return;
+        const base = `/projects/${project.id}/resources`;
+        const services = ctx.index.adapters.map((a) => a.authority.id).sort();
+        const q = { service: req.query.service, kind: req.query.kind, cursor: req.query.cursor };
+        let filter = { service: null, kind: null, cursor: null };
+        let result = null, refused = null;
+        try {
+            filter = listQuery(q, config);
+            result = await ctx.index.list({ ...filter, project: project.id, limit: RESOURCES_PER_PAGE });
+        } catch (err) {
+            if (!(err instanceof ServiceError) || err.status !== 400) throw err;
+            refused = err;
+        }
+        const link = (o) => {
+            const p = new URLSearchParams();
+            for (const [k, v] of Object.entries({ service: filter.service, kind: filter.kind, ...o })) if (v) p.set(k, v);
+            const s = p.toString();
+            return s ? `${base}?${s}` : base;
+        };
+        const me = req.viewer.subject;
+        const ownerCell = (o) => {
+            if (!o) return html`<span class="muted">—</span>`;
+            if (o.type === 'user' && o.id === me) return 'you';
+            return html`<code class="small">${o.id}</code>`;
+        };
+        const rows = result ? result.resources.map((x) => [
+            html`${x.name || x.id}<br><code class="small">${x.ovrn || x.id}</code>`,
+            html`<a href="${link({ kind: x.kind, service: null })}"><code>${x.kind}</code></a>`,
+            stateBadge(x.state), ownerCell(x.owner), time(x.created_at), time(x.updated_at),
+        ]) : [];
+        const partial = result ? result.partial : [];
+        const filtered = Boolean(filter.service || filter.kind);
+        page(req, res, {
+            title: `Resources · ${project.name}`, crumbs: [{ label: 'Projects', href: '/projects' }, { label: project.name, href: back(req) }, { label: 'Resources' }],
+            body: html`<h1>Resources <small>${project.name}</small></h1>
+<p class="muted">Each OpenVibe service answers for its own resources in this project, read just now and merged here. Services shows them; the service that holds each one owns it.</p>
+<form method="get" action="${base}" class="inline-form">
+<label>Service <select name="service"><option value="">every service</option>${services.map((s) => html`<option value="${s}"${s === filter.service ? raw(' selected') : ''}>${s}</option>`)}</select></label>
+<label>Kind <input name="kind" value="${filter.kind || ''}" placeholder="media.object" maxlength="72" spellcheck="false"></label>
+<button type="submit">Show</button>${filtered ? html` <a href="${base}">Clear</a>` : ''}</form>
+${refused ? notice(html`That filter was refused: ${refused.detail || refused.message} (<code>${refused.code}</code>).`, 'bad') : ''}
+${partial.length ? notice(html`Not on this page: ${partial.map((p, i) => html`${i ? ', ' : ''}<strong>${p.service}</strong> (<code>${p.code}</code>)`)} could not be read just now. Everything else is here; reload to try ${partial.length === 1 ? 'it' : 'them'} again.`, 'warn') : ''}
+${result ? table(['Resource', 'Kind', 'State', 'Owner', 'Created', 'Updated'], rows, {
+                empty: filtered ? 'No resources match this filter.' : 'No resources in this project yet. Releases, Media objects, event subscriptions and the other things apps in this project create appear here.',
+            }) : ''}
+${result && (filter.cursor || result.next_cursor) ? html`<p>${filter.cursor ? html`<a href="${link({})}">First page</a>` : ''}${filter.cursor && result.next_cursor ? ' · ' : ''}${result.next_cursor ? html`<a href="${link({ cursor: result.next_cursor })}">Next page</a>` : ''}</p>` : ''}
+<p class="muted small">Things a person owns outside any project (robots, chat rooms, streams) are on those products' own pages. Apps read this list with <a href="/docs/capabilities/services.resource.read"><code>services.resource.read</code></a>: <code>GET /api/v1/resources?project=${project.id}</code>.</p>`,
+        }, refused ? 400 : 200);
     });
 
     // ── Usage (WS-N task 4): Network's per-day numbers from the services' rollups ──
