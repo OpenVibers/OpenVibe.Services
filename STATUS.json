@@ -8,11 +8,11 @@
   "port": 4930,
   "domain": "openvibe.services",
   "contracts": "openvibe-contracts v0.127.0",
-  "sdk": "openvibe-sdk v0.37.0",
+  "sdk": "openvibe-sdk v0.37.1",
   "shared": "openvibe-shared v2.21.0",
   "packages": [
     "openvibe-contracts v0.127.0",
-    "openvibe-sdk v0.37.0",
+    "openvibe-sdk v0.37.1",
     "openvibe-shared v2.21.0"
   ],
   "capabilities": [
