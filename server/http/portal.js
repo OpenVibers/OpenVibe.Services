@@ -123,6 +123,7 @@ ${table(['Project', 'Your role', 'Environments', 'Apps', 'Created'], list.map((p
                 html`<a href="/projects/${p.id}">${p.name}</a><br><code class="small">${p.id}</code>${p.archived_at ? html` ${badge('archived', 'bad')}` : ''}`,
                 p.role || (req.viewer.staff ? 'staff' : '—'), (p.environments || []).join(', '), p.counts ? p.counts.apps : '—', time(p.created_at),
             ]), { empty: 'You are not a member of any project yet.' })}
+<p><a href="/projects/mine">Your resources</a> <span class="muted small">what you own outside any project: robots, chat rooms, streams, watches, Actor tasks</span></p>
 <h2>Create a project</h2>
 <form method="post" action="/projects" class="inline-form">${csrfField(csrf(req))}
 <label>Name <input name="name" required maxlength="80"></label><button type="submit">Create</button></form>
@@ -142,6 +143,19 @@ ${table(['Project', 'Your role', 'Environments', 'Apps', 'Created'], list.map((p
         if (!got.ok) { problemPage(req, res, got.problem, { title: 'Project', back: '/projects' }); return null; }
         return got.data;
     }
+
+    // Yours: what the signed-in person owns outside any project. Only their own subject is ever asked for.
+    r.get('/mine', async (req, res) => {
+        await resourcesPage(req, res, {
+            scope: { owner: req.viewer.subject }, base: '/projects/mine',
+            title: 'Your resources', crumbs: [{ label: 'Projects', href: '/projects' }, { label: 'Your resources' }],
+            heading: html`<h1>Your resources</h1>`,
+            intro: 'What you own yourself, outside any project: your robots, chat rooms, streams, watches, Actor tasks and the rest. Each OpenVibe service answers for its own, read just now and merged here; the service that holds each one owns it.',
+            empty: 'Nothing of yours outside a project yet. A robot you add on OpenVibe.Bot, a room you open on OpenVibe.Chat, a stream on OpenRestream or a watch on OpenVibe.Watch appears here.',
+            footer: html`Resources in a project are on that project's page: <a href="/projects">your projects</a>.`,
+            ownerColumn: false,
+        });
+    });
 
     r.get('/:project', idParams, async (req, res) => {
         const project = await loadProject(req, res);
@@ -338,20 +352,20 @@ ${got.data.next_before ? html`<p><a href="/projects/${project.id}/audit?before=$
         });
     });
 
-    // ── Resources (ADR-048, plan T13): the merged index, as the API serves it to a member ──
-    // Network decides membership (loadProject) before any authority is asked; the index then reads every
-    // authority for this project only and keeps the page to it (server/resources.js).
-    r.get('/:project/resources', idParams, async (req, res) => {
-        const project = await loadProject(req, res);
-        if (!project) return;
-        const base = `/projects/${project.id}/resources`;
+    // ── Resources (ADR-048, plan T13): the merged index, as the API serves it ──
+    /**
+     * One page of the merged index for one scope: a project (any member; Network decided membership before this), or
+     * the signed-in person's own resources (`owner`: the ones in no project, each authority filtering by its own owner
+     * column, server/resources.js keeping the page to them).
+     */
+    async function resourcesPage(req, res, { scope, base, title, crumbs, heading, intro, empty, footer, ownerColumn }) {
         const services = ctx.index.adapters.map((a) => a.authority.id).sort();
         const q = { service: req.query.service, kind: req.query.kind, cursor: req.query.cursor };
         let filter = { service: null, kind: null, cursor: null };
         let result = null, refused = null;
         try {
             filter = listQuery(q, config);
-            result = await ctx.index.list({ ...filter, project: project.id, limit: RESOURCES_PER_PAGE });
+            result = await ctx.index.list({ ...filter, ...scope, limit: RESOURCES_PER_PAGE });
         } catch (err) {
             if (!(err instanceof ServiceError) || err.status !== 400) throw err;
             refused = err;
@@ -371,26 +385,42 @@ ${got.data.next_before ? html`<p><a href="/projects/${project.id}/audit?before=$
         const rows = result ? result.resources.map((x) => [
             html`${x.name || x.id}<br><code class="small">${x.ovrn || x.id}</code>`,
             html`<a href="${link({ kind: x.kind, service: null })}"><code>${x.kind}</code></a>`,
-            stateBadge(x.state), ownerCell(x.owner), time(x.created_at), time(x.updated_at),
+            stateBadge(x.state),
+            ...(ownerColumn ? [ownerCell(x.owner)] : []),
+            time(x.created_at), time(x.updated_at),
         ]) : [];
         const partial = result ? result.partial : [];
         const filtered = Boolean(filter.service || filter.kind);
         page(req, res, {
-            title: `Resources · ${project.name}`, crumbs: [{ label: 'Projects', href: '/projects' }, { label: project.name, href: back(req) }, { label: 'Resources' }],
-            body: html`<h1>Resources <small>${project.name}</small></h1>
-<p class="muted">Each OpenVibe service answers for its own resources in this project, read just now and merged here. Services shows them; the service that holds each one owns it.</p>
+            title, crumbs,
+            body: html`${heading}
+<p class="muted">${intro}</p>
 <form method="get" action="${base}" class="inline-form">
 <label>Service <select name="service"><option value="">every service</option>${services.map((s) => html`<option value="${s}"${s === filter.service ? raw(' selected') : ''}>${s}</option>`)}</select></label>
 <label>Kind <input name="kind" value="${filter.kind || ''}" placeholder="media.object" maxlength="72" spellcheck="false"></label>
 <button type="submit">Show</button>${filtered ? html` <a href="${base}">Clear</a>` : ''}</form>
 ${refused ? notice(html`That filter was refused: ${refused.detail || refused.message} (<code>${refused.code}</code>).`, 'bad') : ''}
 ${partial.length ? notice(html`Not on this page: ${partial.map((p, i) => html`${i ? ', ' : ''}<strong>${p.service}</strong> (<code>${p.code}</code>)`)} could not be read just now. Everything else is here; reload to try ${partial.length === 1 ? 'it' : 'them'} again.`, 'warn') : ''}
-${result ? table(['Resource', 'Kind', 'State', 'Owner', 'Created', 'Updated'], rows, {
-                empty: filtered ? 'No resources match this filter.' : 'No resources in this project yet. Releases, Media objects, event subscriptions and the other things apps in this project create appear here.',
+${result ? table(['Resource', 'Kind', 'State', ...(ownerColumn ? ['Owner'] : []), 'Created', 'Updated'], rows, {
+                empty: filtered ? 'No resources match this filter.' : empty,
             }) : ''}
 ${result && (filter.cursor || result.next_cursor) ? html`<p>${filter.cursor ? html`<a href="${link({})}">First page</a>` : ''}${filter.cursor && result.next_cursor ? ' · ' : ''}${result.next_cursor ? html`<a href="${link({ cursor: result.next_cursor })}">Next page</a>` : ''}</p>` : ''}
-<p class="muted small">Things a person owns outside any project (robots, chat rooms, streams) are on those products' own pages. Apps read this list with <a href="/docs/capabilities/services.resource.read"><code>services.resource.read</code></a>: <code>GET /api/v1/resources?project=${project.id}</code>.</p>`,
+<p class="muted small">${footer}</p>`,
         }, refused ? 400 : 200);
+    }
+
+    r.get('/:project/resources', idParams, async (req, res) => {
+        const project = await loadProject(req, res);
+        if (!project) return;
+        await resourcesPage(req, res, {
+            scope: { project: project.id }, base: `/projects/${project.id}/resources`,
+            title: `Resources · ${project.name}`, crumbs: [{ label: 'Projects', href: '/projects' }, { label: project.name, href: back(req) }, { label: 'Resources' }],
+            heading: html`<h1>Resources <small>${project.name}</small></h1>`,
+            intro: 'Each OpenVibe service answers for its own resources in this project, read just now and merged here. Services shows them; the service that holds each one owns it.',
+            empty: 'No resources in this project yet. Releases, Media objects, event subscriptions and the other things apps in this project create appear here.',
+            footer: html`What you own outside any project (robots, chat rooms, streams) is on <a href="/projects/mine">your resources</a>. Apps read this list with <a href="/docs/capabilities/services.resource.read"><code>services.resource.read</code></a>: <code>GET /api/v1/resources?project=${project.id}</code>.`,
+            ownerColumn: true,
+        });
     });
 
     // ── Usage (WS-N task 4): Network's per-day numbers from the services' rollups ──
