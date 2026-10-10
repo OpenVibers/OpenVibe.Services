@@ -1,9 +1,9 @@
 'use strict';
 /**
- * server/authorities/index.js against the REAL pinned openvibe-contracts (v0.130.0): the registry is
+ * server/authorities/index.js against the REAL pinned openvibe-contracts (v0.131.0): the registry is
  * derived from the released service manifests — every non-placeholder service whose manifest lists an
- * active <id>.resource.read — and never hand-maintained. The eight authorities of the pin (0.130.0 added
- * watch, actor, bot and chat, plan T13 step 8 phase 2), their manifest
+ * active <id>.resource.read — and never hand-maintained. The nine authorities of the pin (0.130.0 added
+ * watch, actor, bot and chat, 0.131.0 OpenRestream; plan T13 step 8 phase 2), their manifest
  * loopback origins and their audiences; Services itself (read in process: server/registry/self-authority.js),
  * Codes (retired codes.resource.read at 0.113.0, when its portal moved here), placeholders and services without
  * the capability are not authorities.
@@ -17,13 +17,13 @@ const { createAuthorities } = require('../server/authorities');
 const { check, done } = require('./helpers/app');
 
 const quiet = { warn() {}, log() {}, error() {} };
-const AUTHORITIES = ['actor', 'bot', 'chat', 'events', 'host', 'media', 'network', 'watch'];
+const AUTHORITIES = ['actor', 'bot', 'chat', 'events', 'host', 'media', 'network', 'openre', 'watch'];
 
 async function main() {
-    await check('the pin lists nine active <id>.resource.read capabilities, eight of them authorities', () => {
+    await check('the pin lists ten active <id>.resource.read capabilities, nine of them authorities', () => {
         const ids = contracts.capabilities.manifests.filter((c) => /^([a-z][a-z0-9-]{0,31})\.resource\.read$/.test(c.id) && c.status === 'active').map((c) => c.id).sort();
         assert.deepStrictEqual(ids, ['actor.resource.read', 'bot.resource.read', 'chat.resource.read', 'events.resource.read', 'host.resource.read',
-            'media.resource.read', 'network.resource.read', 'services.resource.read', 'watch.resource.read']);
+            'media.resource.read', 'network.resource.read', 'openre.resource.read', 'services.resource.read', 'watch.resource.read']);
         assert.strictEqual(contracts.capabilities.get('codes.resource.read').status, 'retired', 'Codes owns no resources since 0.113.0');
         // services.resource.read is Services' own id; Services is never its own authority (the next check).
         assert.ok(!createAuthorities(loadConfig({}), { log: quiet }).ids().includes('services'));
@@ -41,6 +41,7 @@ async function main() {
             actor: 'http://127.0.0.1:4950',
             bot: 'http://127.0.0.1:4630',
             chat: 'http://127.0.0.1:4400',
+            openre: 'http://127.0.0.1:4500',
         };
         for (const [id, origin] of Object.entries(expected)) {
             const a = registry.get(id);
