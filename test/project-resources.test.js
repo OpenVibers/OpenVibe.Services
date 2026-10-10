@@ -141,6 +141,49 @@ const { boot, check, done } = require('./helpers/boot');
         assert.deepStrictEqual(new Set(seen), want);
     });
 
+    await check('your resources: the person\'s own, in no project, asked of every authority by owner and kept to them', async () => {
+        const { createResourceIndexService } = require('../server/resources');
+        const bob = t.network.addUser('bob');
+        const at = '2026-10-01T00:00:00.000Z';
+        const rob = (id, owner, extra = {}) => ({ id, kind: 'bot.robot', service: 'bot', name: `Robot ${id.slice(-2)}`, state: 'ready', created_at: at, ...(owner ? { owner: { type: 'user', id: owner } } : {}), ...extra });
+        const R1 = 'rob_01JAB2C3D4E5F6G7H8J9K0MN01', R2 = 'rob_01JAB2C3D4E5F6G7H8J9K0MN02', R3 = 'rob_01JAB2C3D4E5F6G7H8J9K0MN03', R4 = 'rob_01JAB2C3D4E5F6G7H8J9K0MN04';
+        const seen = [];
+        // An authority that has not added the owner filter: it answers everyone's, including a projected row of the owner.
+        const careless = {
+            authority: Object.freeze({ id: 'bot', name: 'OpenVibe.Bot', internalOrigin: 'http://bot.fake', publicOrigin: 'https://openvibe.bot', audience: 'openvibe.bot', capability: 'bot.resource.read', status: 'in-process' }),
+            origin: 'http://bot.fake',
+            async fetchAs(url) {
+                seen.push(new URL(url));
+                const body = { resources: [rob(R1, owner.subject), rob(R2, bob.subject), rob(R3, null), rob(R4, owner.subject, { project_id: projectId })], next_cursor: null };
+                return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+            },
+            get: async () => ({ status: 404, body: {} }),
+        };
+        const index = createResourceIndexService({ config: t.ctx.config, authorities: { list: () => [] }, tokens: null, self: careless, log: { warn() {} } });
+        const direct = await index.list({ owner: owner.subject });
+        assert.deepStrictEqual(direct.resources.map((x) => x.id), [R1], 'only the owner\'s, and only outside a project');
+        assert.strictEqual(seen[0].searchParams.get('owner'), owner.subject, 'owner is asked of the authority');
+
+        const kept = t.ctx.index;
+        t.ctx.index = index;
+        try {
+            const r = await t.get('/projects/mine', { as: owner });
+            assert.strictEqual(r.status, 200, r.text.slice(0, 300));
+            assert.match(r.text, /<h1>Your resources<\/h1>/);
+            assert.ok(r.text.includes(R1) && !r.text.includes(R2) && !r.text.includes(R3) && !r.text.includes(R4), 'the person\'s own row only');
+            assert.ok(!r.text.includes('<th scope="col">Owner</th>'), 'no owner column: all of it is theirs');
+            assert.strictEqual(seen.at(-1).searchParams.get('owner'), owner.subject, 'the signed-in person\'s subject, never a query value');
+            const forged = await t.get(`/projects/mine?owner=${bob.subject}`, { as: owner });
+            assert.ok(!forged.text.includes(R2), 'a query cannot name someone else');
+            assert.strictEqual(seen.at(-1).searchParams.get('owner'), owner.subject);
+            const b = await t.get('/projects/mine', { as: bob });
+            assert.ok(b.text.includes(R2) && !b.text.includes(R1), 'each person sees their own');
+            assert.strictEqual((await t.get('/projects/mine')).status, 401, 'signed out: sign in');
+            const list = await t.get('/projects', { as: owner });
+            assert.ok(list.text.includes('<a href="/projects/mine">Your resources</a>'), 'the projects page links it');
+        } finally { t.ctx.index = kept; }
+    });
+
     t.ctx.index.list = realList;
     await done(t);
 })();

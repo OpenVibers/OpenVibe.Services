@@ -12,7 +12,7 @@
  *   - the authority set (one adapter each, its own client-credentials token; server/authorities/),
  *   - a deterministic total order over the merged resources (service, ovrn, id) and an opaque keyset
  *     cursor into it, so a page walk never repeats or skips a resource,
- *   - a local filter for `project` / `kind` / `service` on top of the authorities' own answers: a
+ *   - a local filter for `project` / `kind` / `service` / `owner` on top of the authorities' own answers: a
  *     scoped read (a person's, above all) must never show a row outside its scope even if an authority
  *     ignores a query parameter,
  *   - and the partial answer. common.resource-list-result@1's `partial` array (contracts 1.1.0) names
@@ -85,17 +85,21 @@ function createResourceIndexService({ config, authorities, tokens, self = null, 
      * authorities whose rows this page could not include (their cursor walk failed, timed out or was
      * refused), `code` being the problem code each one answered, in the caller's terms.
      */
-    async function list({ project = null, kind = null, service = null, cursor = null, limit = config.index.defaultLimit } = {}) {
+    async function list({ project = null, kind = null, service = null, owner = null, cursor = null, limit = config.index.defaultLimit } = {}) {
         const set = service ? adapters.filter((a) => a.authority.id === service) : adapters;
         if (service && !set.length) throw new ServiceError(400, 'resources.unknown_service', `${service} is not an authority Services reads`);
         if (!set.length) return { resources: [], next_cursor: null, partial: [] };
-        const { resources, stale } = await indexFor(set).list({ project, kind, limit: config.index.pageSize });
+        const { resources, stale } = await indexFor(set).list({ project, kind, owner, limit: config.index.pageSize });
         let merged = resources;
         // The authority filters on its own; this keeps a scoped read scoped even if one does not
         // (project_id is optional on common.resource-summary@1, so a row without one fails a project filter).
         if (service) merged = merged.filter((r) => r.service === service);
         if (kind) merged = merged.filter((r) => r.kind === kind);
         if (project) merged = merged.filter((r) => r.project_id === project);
+        // A person's own (owner): each authority filters on its owner column (openvibe-sdk 0.41 sends ?owner=); this
+        // keeps the page to them even if one does not yet, and to what is in no project (a project's resources are
+        // read through the project, where membership decides).
+        if (owner) merged = merged.filter((r) => r.owner && r.owner.id === owner && !r.project_id);
         merged = merged.slice().sort((a, b) => compare(sortKeyOf(a), sortKeyOf(b)));
         const after = cursor ? decodeCursor(cursor) : null;
         if (cursor && after === null) throw new ServiceError(400, 'resources.bad_query', 'cursor must be one this index issued');
