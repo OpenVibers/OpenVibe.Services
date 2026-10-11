@@ -95,7 +95,7 @@ ${got.code ? html`<h2>Exchange it (on your server)</h2>
         viewer: req.viewer, config, path: '/tools/webhooks', title: 'Webhook tester', index: true, scripts: ['js/webhook.js'],
         crumbs: [{ label: 'Webhooks' }],
         body: html`<h1>Webhook tester and signed-event inspector</h1>
-<p>OpenVibe.Events delivers each event as <code>POST</code> with the body <code>{"event": &lt;envelope&gt;, "seq": &lt;n&gt;}</code> and these headers, signed with your subscription secret:</p>
+<p>OpenVibe.Events delivers each event as <code>POST</code> with the body <code>{"event": &lt;envelope&gt;}</code> (no sequence number: dedupe on the event id) and these headers, signed with your subscription secret:</p>
 <ul>
 <li><code>X-OpenVibe-Timestamp: &lt;unix seconds&gt;</code>, the time this attempt was sent. Every retry gets a new one.</li>
 <li><code>X-OpenVibe-Signature-V2: t=&lt;that timestamp&gt;,v2=&lt;hex HMAC-SHA256 of "&lt;t&gt;.&lt;raw body&gt;"&gt;</code> (v2).</li>
@@ -134,7 +134,7 @@ ${v2.timestampsAgree != null ? html`<dt>X-OpenVibe-Timestamp</dt><dd>${code(v2.s
 <dt>Expected</dt><dd>${code(v2.expected || '(needs a t= value)')}</dd><dt>Given</dt><dd>${code(v2.given || '(none)')}</dd></dl>
 <h3>Body</h3>
 <dl class="facts"><dt>Size</dt><dd>${v.bodyBytes} bytes</dd>
-${v.parsed && v.parsed.event_type ? html`<dt>Event</dt><dd>${code(v.parsed.event_type)} ${code(v.parsed.event_id || '')} seq ${v.parsed.seq}; envelope ${v.parsed.envelopeValid ? 'validates' : html`does not validate: ${v.parsed.envelopeErrors.map((e) => `${e.path} ${e.message}`).join('; ')}`}</dd>` : ''}
+${v.parsed && v.parsed.event_type ? html`<dt>Event</dt><dd>${code(v.parsed.event_type)} ${code(v.parsed.event_id || '')}; envelope ${v.parsed.envelopeValid ? 'validates' : html`does not validate: ${v.parsed.envelopeErrors.map((e) => `${e.path} ${e.message}`).join('; ')}`}</dd>` : ''}
 ${v.parsed && v.parsed.note ? html`<dt>Shape</dt><dd>${v.parsed.note}</dd>` : ''}</dl></div>`;
     }
 

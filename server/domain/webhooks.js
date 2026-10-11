@@ -3,8 +3,8 @@
 /**
  * Webhook tester and signed-event inspector.
  *
- * OpenVibe.Events delivers `{ "event": <events.event-envelope@1>, "seq": <n> }` signed under the
- * subscription secret:
+ * OpenVibe.Events delivers `{ "event": <events.event-envelope@1> }` (no sequence number: a receiver dedupes on
+ * event.event_id; ADR-042) signed under the subscription secret:
  *   X-OpenVibe-Timestamp:    <unix seconds this attempt was sent>
  *   X-OpenVibe-Signature-V2: t=<that timestamp>,v2=<hex HMAC-SHA256 of "<t>.<raw body>">
  * Every consumer requires v2 and refuses it more than 300 s from its own clock (replay window).
@@ -94,9 +94,9 @@ function inspect({ rawBody, signatureV2, timestamp, secret, now = Date.now() }) 
         const obj = JSON.parse(body);
         if (obj && typeof obj === 'object' && obj.event) {
             const v = contracts.validate('events.event-envelope@1', obj.event);
-            parsed = { event_type: obj.event.event_type || null, event_id: obj.event.event_id || null, seq: obj.seq ?? null, envelopeValid: v.valid, envelopeErrors: v.errors };
+            parsed = { event_type: obj.event.event_type || null, event_id: obj.event.event_id || null, envelopeValid: v.valid, envelopeErrors: v.errors };
         } else {
-            parsed = { note: 'JSON, but not an Events delivery ({ event, seq })' };
+            parsed = { note: 'JSON, but not an Events delivery ({ event })' };
         }
     } catch { parsed = { note: 'not JSON' }; }
     return { accepted: v2.valid, v2, bodyBytes: Buffer.byteLength(body), parsed };
@@ -123,15 +123,13 @@ function sample({ eventType, secret, producer, now = Date.now() }) {
         trace_id: crypto.randomBytes(16).toString('hex'),
     };
     const check = contracts.validate('events.event-envelope@1', envelope);
-    const seq = 1;
-    const body = JSON.stringify({ event: envelope, seq });
+    const body = JSON.stringify({ event: envelope });
     const subscriptionId = `sub_${contracts.ids.ulid(now)}`;
     const headers = {
         'Content-Type': 'application/json',
         'User-Agent': 'OpenVibe.Events/0.1',
         'X-OpenVibe-Event-Id': envelope.event_id,
         'X-OpenVibe-Event-Type': eventType,
-        'X-OpenVibe-Seq': String(seq),
         'X-OpenVibe-Subscription-Id': subscriptionId,
         'X-OpenVibe-Delivery-Attempt': '1',
         'X-OpenVibe-Hops': '0',

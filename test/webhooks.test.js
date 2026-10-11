@@ -19,7 +19,7 @@ const hmacV1 = (body, secret) => `sha256=${crypto.createHmac('sha256', secret).u
 
 (async () => {
     const secret = 'whsec_' + crypto.randomBytes(16).toString('hex');
-    const body = JSON.stringify({ event: { event_id: contracts.ids.newId('event'), event_type: 'network.app.created', version: 1, source: 'network', actor: { type: 'system', id: 'network' }, timestamp: new Date().toISOString(), subject: { type: 'app', id: 'app_1' }, payload: {} }, seq: 7 });
+    const body = JSON.stringify({ event: { event_id: contracts.ids.newId('event'), event_type: 'network.app.created', version: 1, source: 'network', actor: { type: 'system', id: 'network' }, timestamp: new Date().toISOString(), subject: { type: 'app', id: 'app_1' }, payload: {} } });
 
     // A clock 0.7 s into a second: ages are whole seconds, the window is checked on the exact time.
     const nowSec = Math.floor(Date.now() / 1000);
@@ -37,7 +37,7 @@ const hmacV1 = (body, secret) => `sha256=${crypto.createHmac('sha256', secret).u
         assert.strictEqual(v.v2.expected, v2(body, secret, nowSec));
         assert.strictEqual(v.v2.windowSec, 300);
         assert.strictEqual(v.parsed.event_type, 'network.app.created');
-        assert.strictEqual(v.parsed.seq, 7);
+        assert.strictEqual('seq' in v.parsed, false, 'Events sends no sequence number (ADR-042)');
         assert.strictEqual(v.bodyBytes, Buffer.byteLength(body));
     });
 
@@ -81,7 +81,7 @@ const hmacV1 = (body, secret) => `sha256=${crypto.createHmac('sha256', secret).u
         assert.strictEqual(wrongSecret.accepted, false);
         assert.strictEqual(wrongSecret.v2.signatureValid, false);
         assert.match(wrongSecret.v2.reason, /does not match/);
-        assert.strictEqual(run({ rawBody: body.replace('"seq":7', '"seq":8') }).accepted, false);
+        assert.strictEqual(run({ rawBody: body.replace('"source":"network"', '"source":"netw0rk"') }).accepted, false);
         // The HMAC for one time moved onto another: the time is covered by the signature.
         const moved = run({ signatureV2: good.replace(`t=${nowSec}`, `t=${nowSec - 1}`) });
         assert.strictEqual(moved.accepted, false);
@@ -137,7 +137,8 @@ const hmacV1 = (body, secret) => `sha256=${crypto.createHmac('sha256', secret).u
         assert.strictEqual(verifyDeliveryV2(s.body, headers, secret, { now: nowMs }), true);
         const parsed = parseDelivery(s.body, headers, secret, { requireV2: true, now: nowMs });
         assert.strictEqual(parsed.event.event_type, 'media.object.ready');
-        assert.strictEqual(parsed.seq, 1);
+        assert.strictEqual('seq' in JSON.parse(s.body), false, 'the sample is { event }, like Events sends it');
+        assert.strictEqual(headers['x-openvibe-seq'], undefined, 'and no X-OpenVibe-Seq');
         assert.strictEqual(contracts.validate('events.event-envelope@1', parsed.event).valid, true);
         assert.strictEqual(parseDelivery(s.body, headers, secret, { requireV2: true, now: nowMs + 301_000 }), null, 'the sample goes stale after 300 s');
         assert.strictEqual(parseDelivery(s.body, headers, 'wrong', { requireV2: true, now: nowMs }), null);
