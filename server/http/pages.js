@@ -91,7 +91,7 @@ ${raw(showcase.features({
                     { icon: 'ov:check', title: 'Capability grants', text: 'Ask for exactly what your app does; grants are approved inside the project\'s allowance.', href: '/docs/capabilities?grantable=1' },
                     { icon: 'ov:bell', title: 'Events and webhooks', text: 'Subscribe to the network and verify every delivery\'s signature.', href: '/tools/webhooks' },
                     { icon: 'ov:docs', title: 'Reference and SDK', text: `APIs, contracts, capabilities and events from openvibe-contracts v${docs.contractsVersion}; openvibe-sdk v${docs.sdkVersion} for browser and server.`, href: '/docs' },
-                    { icon: 'ov:search', title: 'One resource index', text: 'Every resource of a project across every service, behind one API, with each service keeping its own data.', href: '/docs/api/services' },
+                    { icon: 'ov:search', title: 'One resource index', text: 'Every resource of a project across every service, and on Your resources everything you own yourself (robots, rooms, streams, watches, Actor tasks, pastes), behind one API; each service keeps its own data.', href: '/docs/api/services' },
                     { icon: 'ov:download', title: 'Take it with you', text: 'Export a project\'s configuration, objects and events as one archive, any time.', href: '/docs/export' },
                 ],
             }))}
