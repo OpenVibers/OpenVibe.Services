@@ -17,13 +17,15 @@ const { createAuthorities } = require('../server/authorities');
 const { check, done } = require('./helpers/app');
 
 const quiet = { warn() {}, log() {}, error() {} };
-const AUTHORITIES = ['actor', 'bot', 'chat', 'community', 'events', 'host', 'media', 'network', 'openre', 'watch'];
+// Static hosting's index is Space's since contracts 0.150.0 (the engine moved from Host, plan T20).
+const AUTHORITIES = ['actor', 'bot', 'chat', 'community', 'events', 'media', 'network', 'openre', 'space', 'watch'];
 
 async function main() {
     await check('the pin lists eleven active <id>.resource.read capabilities, ten of them authorities', () => {
         const ids = contracts.capabilities.manifests.filter((c) => /^([a-z][a-z0-9-]{0,31})\.resource\.read$/.test(c.id) && c.status === 'active').map((c) => c.id).sort();
-        assert.deepStrictEqual(ids, ['actor.resource.read', 'bot.resource.read', 'chat.resource.read', 'community.resource.read', 'events.resource.read', 'host.resource.read',
-            'media.resource.read', 'network.resource.read', 'openre.resource.read', 'services.resource.read', 'watch.resource.read']);
+        assert.deepStrictEqual(ids, ['actor.resource.read', 'bot.resource.read', 'chat.resource.read', 'community.resource.read', 'events.resource.read',
+            'media.resource.read', 'network.resource.read', 'openre.resource.read', 'services.resource.read', 'space.resource.read', 'watch.resource.read']);
+        assert.strictEqual(contracts.capabilities.get('host.resource.read').status, 'retired', 'Host serves no hosting index since 0.150.0');
         assert.strictEqual(contracts.capabilities.get('codes.resource.read').status, 'retired', 'Codes owns no resources since 0.113.0');
         // services.resource.read is Services' own id; Services is never its own authority (the next check).
         assert.ok(!createAuthorities(loadConfig({}), { log: quiet }).ids().includes('services'));
@@ -36,7 +38,7 @@ async function main() {
             network: 'http://127.0.0.1:4000',
             media: 'http://127.0.0.1:4100',
             events: 'http://127.0.0.1:4300',
-            host: 'http://127.0.0.1:4910',
+            space: 'http://127.0.0.1:4940',
             watch: 'http://127.0.0.1:4730',
             actor: 'http://127.0.0.1:4950',
             bot: 'http://127.0.0.1:4630',
@@ -60,7 +62,7 @@ async function main() {
 
     await check('Services, placeholders and services without the capability are not authorities', () => {
         const registry = createAuthorities(loadConfig({}), { log: quiet });
-        for (const id of ['services', 'codes', 'run', 'space', 'tools', 'actor-console', 'sites']) {
+        for (const id of ['services', 'codes', 'run', 'host', 'tools', 'actor-console', 'sites']) {
             if (!contracts.services.get(id)) continue;
             assert.strictEqual(registry.get(id), null, `${id} must not be an authority`);
         }
