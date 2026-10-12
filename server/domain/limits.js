@@ -10,8 +10,8 @@
 /** The services that publish /limits.json, with where Services reads them and where people can. */
 function limitSources(env = process.env) {
     return [
-        // public: null until openvibe.host serves Host itself (WS-N task 10, Stage B step 2); read internally meanwhile.
-        { service: 'host', name: 'OpenVibe Host', internal: env.OV_HOST_INTERNAL_URL || 'http://127.0.0.1:4910', public: null },
+        // Static hosting's quotas: OpenVibe.Space since the engine moved from Host (plan T20, 2026-10-12).
+        { service: 'space', name: 'OpenVibe Space', internal: env.OV_SPACE_INTERNAL_URL || 'http://127.0.0.1:4940', public: 'https://openvibe.space/limits.json' },
         { service: 'events', name: 'OpenVibe Events', internal: env.OV_EVENTS_INTERNAL_URL || 'http://127.0.0.1:4300', public: 'https://openvibe.events/limits.json' },
         { service: 'media', name: 'OpenVibe Media', internal: env.OV_MEDIA_INTERNAL_URL || 'http://127.0.0.1:4100', public: 'https://openvibe.media/limits.json' },
     ];

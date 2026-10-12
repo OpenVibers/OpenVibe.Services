@@ -8,12 +8,12 @@
 const assert = require('assert');
 const http = require('http');
 
-const HOST = {
-    service: 'host', scope: 'per project and environment; projects per owner',
+const SPACE = {
+    service: 'space', scope: 'per project and environment; projects per owner',
     limits: [
-        { id: 'custom_domains', label: 'Custom domains', capability: 'host.site.manage', unit: 'count', production: 5, sandbox: 0, exceeded: '429 quota.custom_domains' },
-        { id: 'storage_bytes', label: 'Stored bytes (every deploy kept)', capability: 'host.site.manage', unit: 'bytes', production: 1073741824, sandbox: 104857600, exceeded: '413 quota.storage' },
-        { id: 'deploys_per_day', label: 'Deploys in 24 hours', capability: 'host.site.manage', unit: 'per_day', production: 50, sandbox: 20, exceeded: '429 quota.deploys_per_day' },
+        { id: 'custom_domains', label: 'Custom domains', capability: 'space.site.manage', unit: 'count', production: 5, sandbox: 0, exceeded: '429 quota.custom_domains' },
+        { id: 'storage_bytes', label: 'Stored bytes (every deploy kept)', capability: 'space.site.manage', unit: 'bytes', production: 1073741824, sandbox: 104857600, exceeded: '413 quota.storage' },
+        { id: 'deploys_per_day', label: 'Deploys in 24 hours', capability: 'space.site.manage', unit: 'per_day', production: 50, sandbox: 20, exceeded: '429 quota.deploys_per_day' },
     ],
 };
 const EVENTS = {
@@ -45,9 +45,9 @@ function serve(body) {
 }
 
 (async () => {
-    const host = await serve(HOST);
+    const space = await serve(SPACE);
     const events = await serve(EVENTS);
-    process.env.OV_HOST_INTERNAL_URL = `http://127.0.0.1:${host.address().port}`;
+    process.env.OV_SPACE_INTERNAL_URL = `http://127.0.0.1:${space.address().port}`;
     process.env.OV_EVENTS_INTERNAL_URL = `http://127.0.0.1:${events.address().port}`;
     const media = await serve(MEDIA);
     process.env.OV_MEDIA_INTERNAL_URL = `http://127.0.0.1:${media.address().port}`;
@@ -58,10 +58,10 @@ function serve(body) {
         const r = await t.get('/docs/limits');
         assert.strictEqual(r.status, 200, r.text.slice(0, 300));
         for (const s of ['1 GB', '100 MB', '50 in 24 hours', '120 a minute', '30 a minute', '7 days', 'quota.custom_domains', 'events.quota_exceeded',
-            'openvibe.events/limits.json', 'openvibe.media/limits.json', '72 hours', 'media.quota.exceeded', 'per project and environment (ADR-014)']) {
+            'openvibe.events/limits.json', 'openvibe.media/limits.json', 'openvibe.space/limits.json', '72 hours', 'media.quota.exceeded', 'per project and environment (ADR-014)']) {
             assert.ok(r.text.includes(s), `the page says ${s}`);
         }
-        assert.match(r.text, /Custom domains<\/td><td[^>]*>[^<]*<a[^>]*><code>host\.site\.manage<\/code><\/a><\/td><td[^>]*>none<\/td>/, 'sandbox 0 reads "none"');
+        assert.match(r.text, /Custom domains<\/td><td[^>]*>[^<]*<a[^>]*><code>space\.site\.manage<\/code><\/a><\/td><td[^>]*>none<\/td>/, 'sandbox 0 reads "none"');
         assert.match(r.text, /Webhook subscriptions.*?<td[^>]*>5<\/td><td[^>]*>no limit<\/td>/s, 'production null reads "no limit"');
         assert.ok(r.text.includes('Other capabilities') && r.text.includes('/docs/capabilities/tools.tool.run'), 'owners without /limits.json are listed');
         assert.ok(!/Other capabilities[\s\S]*media\.object\.upload \(/.test(r.text), 'Media publishes its own now');
@@ -78,12 +78,12 @@ function serve(body) {
         assert.strictEqual(r.status, 200);
         assert.ok(r.text.includes('OpenVibe Events&#39;s limits could not be read') || r.text.includes("OpenVibe Events's limits could not be read"), 'the problem is shown');
         assert.ok(!r.text.includes('120 a minute'), 'no Events numbers without Events');
-        assert.ok(r.text.includes('50 in 24 hours'), 'Host still shows');
+        assert.ok(r.text.includes('50 in 24 hours'), 'Space still shows');
         await t2.close();
     });
 
     await t.close();
-    host.close();
+    space.close();
     events.close();
     media.close();
     done();
