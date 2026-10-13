@@ -14,10 +14,10 @@
  *
  * A request that presents a token is judged on that token alone: a bad one is refused, never downgraded.
  *
- * Capabilities: services.resource.read is registered in the pinned openvibe-contracts (status active,
- * visibility first-party), so contracts' manifest and grant rules decide it (wildcards included) — and
- * an id contracts does not know is refused, never allowed. Services enforces exactly the id the manifest
- * names. services.resource.control arrives with plan T13 step 10.
+ * Capabilities: services.resource.read and services.resource.control are registered in the pinned
+ * openvibe-contracts (status active, visibility first-party), so contracts' manifest and grant rules decide
+ * them (wildcards included) — and an id contracts does not know is refused, never allowed. Services enforces
+ * exactly the ids the manifest names.
  */
 const { serviceAuth, capabilities, http, ids } = require('openvibe-contracts');
 const { ServiceError } = require('../util');
@@ -27,11 +27,14 @@ const PROJECT_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
 const ANON = Object.freeze({ kind: 'anonymous' });
 
 /**
- * The capabilities Services enforces. services.resource.read — active and first-party in the pinned
- * openvibe-contracts — is the whole read side of the resource index (list, one, the authority list).
- * services.resource.control arrives with plan T13 step 10.
+ * The capabilities Services enforces, both active and first-party in the pinned openvibe-contracts:
+ * services.resource.read is the whole read side of the resource index (list, one, the authority list);
+ * services.resource.control is POST /api/v1/resources/control (plan T13 step 10).
  */
-const CAPS = Object.freeze({ resourceRead: 'services.resource.read' });
+const CAPS = Object.freeze({ resourceRead: 'services.resource.read', resourceControl: 'services.resource.control' });
+
+/** The project roles that may control a project's resources with their own user token. */
+const CONTROL_ROLES = new Set(['owner', 'admin']);
 
 /** One capability against a token's claims: contracts' manifest and grant rules decide; an unknown id is refused. */
 function capabilityDecision(claims, id) {
@@ -125,6 +128,38 @@ function createApiAuth({ config, keys, userAuth, membership }) {
         }
     }
 
+    /**
+     * The control gate (POST /api/v1/resources/control): anonymous 401; a service token needs
+     * services.resource.control and must be a svc: token (first-party only, like the read side). A user token passes
+     * here; authorizeControl decides their project.
+     */
+    function requireControl(req) {
+        const p = req.principal;
+        if (!p || p.kind === 'anonymous') throw new ServiceError(401, 'token.missing', `${CAPS.resourceControl} needs a Network service or user token`);
+        if (p.kind === 'service') {
+            const d = capabilityDecision(p.claims, CAPS.resourceControl);
+            if (!d.allowed) throw new ServiceError(403, d.code || 'capability.denied', d.reason || `${CAPS.resourceControl} not granted`);
+            if (!String(p.sub || '').startsWith('svc:')) {
+                throw new ServiceError(403, 'capability.denied', `${CAPS.resourceControl} is first-party: a svc: service token or a person's own user token, never an app, mod or agent token`);
+            }
+        }
+    }
+
+    /**
+     * Whether this caller may control resources of `project`: a service token any project; a person only a project
+     * they own or administer (Network answers the role with their own token). Not a member: 404 (existence is not
+     * disclosed); a member below admin: 403.
+     */
+    async function authorizeControl(req, project) {
+        const p = req.principal;
+        if (p.kind === 'service') return { project };
+        const role = await membership.projectRole(p.token, project);
+        if (role === 'unavailable') throw new ServiceError(503, 'network.unavailable', 'OpenVibe.Network could not answer whether this account may control that project');
+        if (!role) throw new ServiceError(404, 'resources.project_not_found', `no project ${project} for this account`);
+        if (!CONTROL_ROLES.has(role)) throw new ServiceError(403, 'capability.denied', `controlling ${project}'s resources needs the owner or admin role`);
+        return { project, role };
+    }
+
     /** The first-party gate: a service token with services.resource.read (the authority registry). */
     function requireServiceRead(req) {
         requireRead(req);
@@ -152,7 +187,7 @@ function createApiAuth({ config, keys, userAuth, membership }) {
         return { project };
     }
 
-    return { middleware, resolve, capabilityDecision, requireRead, requireServiceRead, authorizeProject, projectOf };
+    return { middleware, resolve, capabilityDecision, requireRead, requireServiceRead, requireControl, authorizeProject, authorizeControl, projectOf };
 }
 
 module.exports = { createApiAuth, keyFor, capabilityDecision, userPrincipal, verifyService, decodePayload, projectOf, CAPS, PROJECT_RE, PRINCIPAL_SUB };

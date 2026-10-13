@@ -22,6 +22,14 @@
  *
  * One resource is never merged: /api/v1/resources/:ovrn parses the name with the one parser
  * (contracts.resources.parse), resolves the owning service and asks that authority directly.
+ *
+ * Control (plan T13 step 10): `control(request)` resolves the owning authority from the OVRN (or, for create, the
+ * resource_kind's service) and forwards the common.resource-control-request@1 to it through openvibe-sdk/resources'
+ * createResourceClient (server/authorities/adapter.js). Services never applies anything itself. An authority with no
+ * control endpoint (no active <id>.resource.control, or 404/405/501 from it) answers state `failed` with
+ * resources.authority_unsupported. Services' own resources have no control endpoint yet either. An authority's answer
+ * that is not a common.resource-control-result@1, or that names a resource of another project, is `failed` with
+ * resources.authority_bad_response. The gate, idempotency and logging are server/domain/control.js.
  */
 const contracts = require('openvibe-contracts');
 const { createResourceIndex } = require('openvibe-sdk/resources');
@@ -39,6 +47,21 @@ const SEP = '\u0000';
  */
 const PARTIAL_CODES = Object.freeze({ 'sdk.timeout': 'resources.authority_timeout', 'sdk.network_error': 'resources.authority_unavailable' });
 const partialCodeOf = (stale) => PARTIAL_CODES[stale.code] || stale.code || 'resources.authority_unavailable';
+
+/** An authority status that means "no control endpoint here". */
+const UNSUPPORTED_STATUS = new Set([404, 405, 501]);
+
+/** A common.resource-control-result@1 Services itself writes: `state` with a problem (refused, failed) or without (done, pending). */
+function controlResult(request, state, { problem = null, confirmationRequired = null, result = null, at = new Date().toISOString() } = {}) {
+    const out = { action: request.action };
+    if (request.resource) out.resource = request.resource;
+    out.state = state;
+    if (result) out.result = result;
+    if (confirmationRequired) out.confirmation_required = confirmationRequired;
+    if (problem) out.problem = contracts.http.problem(problem.status, problem.code, { detail: problem.detail });
+    out.at = at;
+    return out;
+}
 
 /** The order a page is cut in: service, then the OVRN when the summary has one (else its id). */
 const sortKeyOf = (r) => `${r.service}${SEP}${r.ovrn || ''}${SEP}${r.id}`;
@@ -146,10 +169,50 @@ function createResourceIndexService({ config, authorities, tokens, self = null, 
         return body;
     }
 
+    /**
+     * The authority that owns what a control request names (the OVRN's service, or resource_kind's for create) →
+     * { service, adapter }, or ServiceError 400 resources.unknown_service.
+     */
+    function controlOwner(request) {
+        const service = request.resource ? parseOvrn(request.resource).service : String(request.resource_kind || '').split('.')[0];
+        const adapter = adapterById.get(service);
+        if (!adapter) throw new ServiceError(400, 'resources.unknown_service', `${service} is not an authority Services reads`);
+        return { service, adapter };
+    }
+
+    /**
+     * One control request, forwarded to the owning authority → its common.resource-control-result@1. Throws ServiceError
+     * 400 resources.unknown_service (no authority of that id); every authority-side outcome is a result, never a throw.
+     */
+    async function control(request) {
+        const { service, adapter } = controlOwner(request);
+        const unsupported = () => controlResult(request, 'failed', { problem: { status: 501, code: 'resources.authority_unsupported', detail: `${service} takes no control requests` } });
+        if (typeof adapter.control !== 'function') return unsupported();
+        let answer;
+        try {
+            answer = await adapter.control(request);
+        } catch (err) {
+            if (UNSUPPORTED_STATUS.has(err.status)) return unsupported();
+            const code = err.code === 'sdk.timeout' ? 'resources.authority_timeout' : err.code === 'sdk.network_error' ? 'resources.authority_unavailable' : 'resources.authority_error';
+            const status = code === 'resources.authority_timeout' ? 504 : 502;
+            log.warn(`[Services] control ${request.action} at ${service}: ${err.code || err.message}`);
+            return controlResult(request, 'failed', { problem: { status, code, detail: err.status ? `${service} answered HTTP ${err.status}` : `${service} did not answer` } });
+        }
+        if (answer === null) return unsupported();
+        const bad = (detail) => controlResult(request, 'failed', { problem: { status: 502, code: 'resources.authority_bad_response', detail } });
+        if (!contracts.resources.checkControlResult(answer).valid) return bad(`${service} answered something that is not a common.resource-control-result@1`);
+        if (answer.resource) {
+            const named = contracts.resources.parse(answer.resource);
+            if (!named || named.project_id !== request.project_id || named.service !== service) return bad(`${service} answered for a resource outside ${request.project_id}`);
+            if (request.resource && answer.resource !== request.resource) return bad(`${service} answered for another resource than ${request.resource}`);
+        }
+        return answer;
+    }
+
     /** Drop the cached SDK indexes (an authority set changed at runtime — boot-time registry today). */
     function reset() { indexes.clear(); }
 
-    return { list, get, resolve, reset, adapters };
+    return { list, get, resolve, control, controlOwner, reset, adapters };
 }
 
-module.exports = { createResourceIndexService, encodeCursor, decodeCursor, sortKeyOf };
+module.exports = { createResourceIndexService, controlResult, encodeCursor, decodeCursor, sortKeyOf };

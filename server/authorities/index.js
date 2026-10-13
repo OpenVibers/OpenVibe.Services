@@ -34,6 +34,10 @@ function createAuthorities(config, { log = console } = {}) {
             log.warn(`[Services] ${m.id} lists ${capId} but names no internalOrigin: it is left out of the registry`);
             continue;
         }
+        // The control side (ADR-048, plan T13 step 10): an authority takes control requests only when its manifest lists
+        // <id>.resource.control and contracts has it active. Otherwise Services answers its control requests unsupported.
+        const controlId = `${m.id}.resource.control`;
+        const controlCap = m.capabilities.includes(controlId) ? contracts.capabilities.get(controlId) : null;
         byId.set(m.id, Object.freeze({
             id: m.id,
             name: m.name || m.id,
@@ -41,6 +45,7 @@ function createAuthorities(config, { log = console } = {}) {
             publicOrigin: m.publicOrigin || null,
             audience: `openvibe.${m.id}`,
             capability: capId,
+            control: controlCap && controlCap.status === 'active' ? controlId : null,
             manifestVersion: m.version || null,
             contractsRange: (m.contractRanges || {})['openvibe-contracts'] || null,
             status: m.status,

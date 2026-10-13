@@ -38,6 +38,7 @@ A place where a developer outside the network goes from an OpenVibe account to a
 | Playgrounds | `/projects/:project/apps/:app/playground` | Media upload (sandbox, `media.object.upload`) and Events publish (`events.app.publish`: types `app.<project_key>.*`, source `app-<app ULID>`), run **as the app** with its own token (from its secret typed for that one request, or a pasted token). Refused — with the missing grant named, and nothing requested or called — unless Network lists the grant as approved. Sandbox apps only. |
 | Manifests | `/manifests/validate`, `/projects/:project/apps/:app/releases/new` | Validate `services.app-manifest@1` and `mods.mod-manifest@1` with openvibe-contracts; create, publish, deprecate and revoke releases. |
 | Resource index | `GET /api/v1/resources`, `GET /api/v1/resources/:ovrn`, `GET /api/v1/authorities` | The merged index over every authority (ADR-048, `services.resource.read`): see [The merged index](#the-merged-index) below. |
+| Resource control | `POST /api/v1/resources/control` | One `common.resource-control-request@1`, routed to the authority that owns the resource (ADR-048, `services.resource.control`): see [Control operations](#control-operations) below. |
 | Policy | `/policy/*` | Proposal process and the decision record; compatibility and deprecation policy rendered from ADR-002 and ADR-016 as published; licensing read from package metadata; transparency (what Services stores and does not). The community documents — code of conduct, contributing, the contributor ladder and the moderation policy — are OpenVibe.Codes' (`https://openvibe.codes/policy/<slug>`); their old addresses here redirect there. |
 | API | `/api/v1/*` | Public release reads (`services.release.read`: no token needed; a presented token must hold it), manifest validation, docs versions; release management by an app with its own token (`services.release.manage`); Services' own resource index (`services.resource.read`, first-party). Guarded with openvibe-contracts `requireCapability`. RFC 9457 problems. |
 | Machine | `/api/health`, `/api/ready`, `/release.json`, `/metrics` | Readiness is truthful (db and docs required; Network, JWKS, OAuth client and events relay reported as optional checks). `/metrics` answers loopback callers only. |
@@ -83,6 +84,34 @@ An authority is never required to answer for the index to answer: a timeout (def
 a malformed page or a Network that cannot mint its token makes that authority partial and leaves the rest of the page
 intact.
 
+## Control operations
+
+`POST /api/v1/resources/control` (plan T13 step 10) takes one `common.resource-control-request@1` and answers the
+owning authority's `common.resource-control-result@1` (`200`, or `202` when `pending`). Services applies nothing:
+
+- **Who may call.** A first-party `svc:` token holding `services.resource.control` (any project), or a person's own user
+  token for a project they **own or administer** (Network answers the role; not a member is `404`, a member below admin
+  `403`). A person acts for themself only: `on_behalf_of` is absent or names them, and Services sends it on.
+- **Routing.** The body is checked with `contracts.resources.checkControlRequest` (`400 control.bad_request`; the
+  contract ties `project_id` to the resource's own project). The authority is the OVRN's service, or `resource_kind`'s
+  for `create` (`400 resources.unknown_service` otherwise), and the request is forwarded through `openvibe-sdk/resources`
+  `createResourceClient` with Services' token for that authority's own `<id>.resource.control`. An authority whose
+  manifest lists no active `<id>.resource.control`, or whose control path answers 404/405/501, is `failed` with
+  `resources.authority_unsupported`. Today that is every authority (none ships a control endpoint yet), and Services'
+  own resources too. An answer that is not a valid result, or names another project's resource, is `failed` with
+  `resources.authority_bad_response`. An authority's own `refused` (with its `confirmation_required`) passes through.
+- **Idempotency.** `services_control_log` holds one row per `idempotency_key` (UNIQUE). A repeat gets the stored answer
+  and the authority is not asked again. A repeat while the first is still running is `409 control.in_progress`. The key
+  reused by another caller or for another request is `409 control.idempotency_conflict`.
+- **Sensitive actions (WS-Z2).** A request made for an agent (`on_behalf_of: { type: 'agent' }`) that deletes, spends
+  money (a money field in `params`) or publishes is `refused` with `confirmation_required: { confirmation_id, reason }`.
+  Network's confirmations (`/internal/confirmations`, `network.confirmation.manage`) mint the id and ask the agent's
+  owner. The retry carries `confirmation_id`. Services spends the approval once, for exactly that request (its
+  digest), before the authority is asked. A standing rule's approval proceeds at once. A dry run, and a person acting
+  with their own token, are not gated here.
+- **Record.** One `services_audit` row per accepted request (a replay too), written with the log row's answer
+  (migration `0004_control.sql`). Neither table stores `params` (only their digest) or a token.
+
 ## The authority registry
 
 `server/authorities/index.js` builds the registry at boot from the **pinned openvibe-contracts service manifests**:
@@ -98,11 +127,11 @@ There is no polling loop: the index reads the authorities on each request (step 
 
 ## Depends on
 
-- **OpenVibe.Network** — SSO (OAuth client `services`, PKCE S256), JWKS, `/api/v1/projects` (called server-side with the person's Network access token), the registry (`/api/v1/registry/services`, `/.well-known/openvibe`), client-credentials tokens (Services' own for the events relay; the app's own in playgrounds).
+- **OpenVibe.Network** — SSO (OAuth client `services`, PKCE S256), JWKS, `/api/v1/projects` (called server-side with the person's Network access token), the registry (`/api/v1/registry/services`, `/.well-known/openvibe`), client-credentials tokens (Services' own for the events relay; the app's own in playgrounds), and the WS-Z2 confirmations (`/internal/confirmations`) for sensitive control operations.
 - **OpenVibe.Events** — the outbox relay publishes `services.app.*` with Services' service token (`events.event.publish`); the Events playground calls it with the app's token (`events.app.publish`); the project archive pulls the project's app events with a Network export token (`events.app.read`).
 - **OpenVibe.Media** — the Media playground uploads with the app's token into the project's namespace; the project archive lists the project's objects, namespaces and download URLs with a Network export token (`media.object.list`, `media.object.read`).
 - **PostgreSQL 18 and Valkey 9** (OpenVibe.Host `roles/data/`, ADR-035): every read and write is async through `openvibe-sdk/db`; Valkey holds the per-actor limit counters (optional).
-- **openvibe-contracts v0.150.0**, **openvibe-sdk v0.35.1**, **openvibe-shared v4.1.3** (pinned tag tarballs; the docs show the tag and the package version, and say so when they differ).
+- **openvibe-contracts v0.154.0**, **openvibe-sdk v0.44.0**, **openvibe-shared v4.1.3** (pinned tag tarballs; the docs show the tag and the package version, and say so when they differ).
 
 No path in Services sends or accepts a shared loopback key (tested by grep and at runtime).
 
@@ -125,6 +154,10 @@ In Network (`server/identity/principals.js` / `server/db/database.js`, as for co
 
 - OAuth client `services`, name `OpenVibe.Services`, redirect URI `https://openvibe.services/auth/callback`.
 - Service grant `['services', 'events.event.publish', 'openvibe.events', []]` (the outbox relay).
+- Control operations (plan T13 step 10): `['services', 'network.confirmation.manage', 'openvibe.network', []]` (the
+  sensitive-action gate; until it is granted, a gated request fails with `confirmations.unavailable` and nothing is
+  applied), and `['services', '<id>.resource.control', 'openvibe.<id>', []]` for each authority once it ships a control
+  endpoint and registers that capability.
 - Account export and deletion (ADR-033): `['services', 'events.subscription.manage', 'openvibe.events', []]` (the two
   account subscriptions, created at boot), then, last and once the release is live,
   `network.account.export.contribute` and `network.account.deletion.confirm` for audience `openvibe.network`.

@@ -58,7 +58,27 @@ function createMembership(config, { fetchImpl = globalThis.fetch } = {}) {
         if (res.status === 401 || res.status === 403) return 'no';
         return 'unavailable';
     }
-    return { projectMember };
+    /**
+     * The caller's role in a project ('owner' | 'admin' | 'developer' | 'viewer'), asked of Network with their own
+     * token: null when they are not a member (404, 401, 403), 'unavailable' when Network cannot answer.
+     */
+    async function projectRole(token, projectId) {
+        const url = `${config.network.url}/api/v1/projects/${encodeURIComponent(projectId)}`;
+        let res;
+        try {
+            res = await fetchImpl(url, {
+                headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+                signal: AbortSignal.timeout(config.index.networkTimeoutMs),
+            });
+        } catch {
+            return 'unavailable';
+        }
+        if (res.status === 404 || res.status === 401 || res.status === 403) { try { await res.body?.cancel(); } catch { /* not needed */ } return null; }
+        if (res.status !== 200) { try { await res.body?.cancel(); } catch { /* not needed */ } return 'unavailable'; }
+        const body = await res.json().catch(() => null);
+        return body && typeof body.role === 'string' ? body.role : null;
+    }
+    return { projectMember, projectRole };
 }
 
 module.exports = { createUserAuth, createMembership };

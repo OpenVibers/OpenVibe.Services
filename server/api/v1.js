@@ -8,9 +8,18 @@
  * | GET /api/v1/resources      | services.resource.read     | ?project=&kind=&service=&cursor=&limit= → common.resource-list-result@1 (merged over every authority; a page that could not read one names it in `partial: [{ service, code }]`) |
  * | GET /api/v1/resources/:ovrn| services.resource.read     | common.no-body@1 → common.resource-summary@1 from the authority that owns it |
  * | GET /api/v1/authorities    | services.resource.read     | common.no-body@1 → { authorities: […] } (Services-local; no contract yet) |
+ * | POST /api/v1/resources/control | services.resource.control | common.resource-control-request@1 → common.resource-control-result@1 from the owning authority (200; 202 when pending) |
  *
- * services.resource.read is registered in the pinned openvibe-contracts (status active, visibility
- * first-party): contracts' manifest decides it, and an id contracts does not know is refused, never allowed.
+ * services.resource.read and services.resource.control are registered in the pinned openvibe-contracts (status
+ * active, visibility first-party): contracts' manifest decides them, and an id contracts does not know is refused,
+ * never allowed.
+ *
+ * Control (plan T13 step 10): a service token holding services.resource.control (any project), or a person's user
+ * token for a project they own or administer (Network answers the role). The body is checked with
+ * contracts.resources.checkControlRequest (400 control.bad_request); idempotency, the sensitive-action gate and the
+ * control-log and audit rows are server/domain/control.js; the forwarding is server/resources.js. 409
+ * control.idempotency_conflict / control.in_progress for a reused or running idempotency_key. An authority's refusal or
+ * failure is a result with state refused or failed, never an HTTP error.
  *
  * Who may call: a Network service token holding services.resource.read (any project, ?project= only
  * narrows), or a person's user token — scoped to ONE project they own or belong to, verified with their
@@ -22,8 +31,9 @@
  * network.unavailable.
  */
 const express = require('express');
-const { http } = require('openvibe-contracts');
+const { http, resources } = require('openvibe-contracts');
 const { ServiceError } = require('../util');
+const { httpStatusOf } = require('../domain/control');
 
 const PROJECT_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
 const SERVICE_RE = /^[a-z][a-z0-9-]{0,31}$/;
@@ -59,7 +69,7 @@ function listQuery(query, config) {
     return out;
 }
 
-function v1Router({ config, apiAuth, index, authorities }) {
+function v1Router({ config, apiAuth, index, authorities, control }) {
     const r = express.Router();
 
     // One merged page over every authority (or the one ?service= names). A failing authority's rows are
@@ -73,6 +83,24 @@ function v1Router({ config, apiAuth, index, authorities }) {
         res.json(page.partial.length
             ? { resources: page.resources, next_cursor: page.next_cursor, partial: page.partial }
             : { resources: page.resources, next_cursor: page.next_cursor });
+    });
+
+    // One control operation, routed to the authority that owns the resource. The body is validated, the caller authorized
+    // for its project_id (which the contract ties to the resource's own project) and only then is anything claimed,
+    // gated or forwarded.
+    r.post('/resources/control', async (req, res) => {
+        apiAuth.requireControl(req);
+        const request = req.body;
+        const check = request && typeof request === 'object' && !Array.isArray(request)
+            ? resources.checkControlRequest(request)
+            : { valid: false, errors: [{ path: '', message: 'the body is a JSON object' }] };
+        if (!check.valid) {
+            throw new ServiceError(400, 'control.bad_request', 'the body is not a valid common.resource-control-request@1',
+                { errors: check.errors.slice(0, 20).map((e) => ({ path: String(e.path || e.instancePath || ''), message: String(e.message || 'invalid') })) });
+        }
+        await apiAuth.authorizeControl(req, request.project_id);
+        const result = await control.run(request, req.principal);
+        res.status(httpStatusOf(result)).json(result);
     });
 
     // One resource by its OVRN, straight from the authority that owns it. The OVRN is parsed first (400),

@@ -7,21 +7,22 @@
   "runtime": "node 22, express 4, PostgreSQL 18 (openvibe-sdk/db)",
   "port": 4930,
   "domain": "openvibe.services",
-  "contracts": "openvibe-contracts v0.150.0",
+  "contracts": "openvibe-contracts v0.154.0",
   "sdk": "openvibe-sdk v0.44.0",
   "shared": "openvibe-shared v4.1.3",
   "packages": [
-    "openvibe-contracts v0.150.0",
+    "openvibe-contracts v0.154.0",
     "openvibe-sdk v0.44.0",
     "openvibe-shared v4.1.3"
   ],
   "capabilities": [
     "services.resource.read",
     "services.release.read",
-    "services.release.manage"
+    "services.release.manage",
+    "services.resource.control"
   ],
   "capabilitiesRegistered": true,
-  "capabilitiesNote": "All three are registered in the pinned openvibe-contracts v0.113.0: services.resource.read (first-party, the merged index), services.release.read (public) and services.release.manage (an app managing its own releases). They replaced codes.resource.read and codes.release.read|manage when the portal moved here. The later services.resource.control, services.recipe.run, services.usage.read and services.cost.read arrive with their plan T13 steps.",
+  "capabilitiesNote": "services.resource.read, services.release.read and services.release.manage are registered since openvibe-contracts v0.113.0: services.resource.read (first-party, the merged index), services.release.read (public) and services.release.manage (an app managing its own releases). They replaced codes.resource.read and codes.release.read|manage when the portal moved here. services.resource.control (first-party, POST /api/v1/resources/control, plan T13 step 10) is registered in v0.154.0. The later services.recipe.run, services.usage.read and services.cost.read arrive with their plan T13 steps.",
   "events": [
     "services.app.published",
     "services.app.deprecated",
