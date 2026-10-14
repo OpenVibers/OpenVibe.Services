@@ -16,11 +16,14 @@ const { boot, check, done } = require('./helpers/boot');
 async function startAuthority() {
     const seen = [];
     let network = null;
+    let listed = [];
     const server = http.createServer((req, res) => {
         const chunks = [];
         req.on('data', (c) => chunks.push(c));
         req.on('end', () => {
             const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
+            // The index, for the console's resources page: what `listed` holds.
+            if (req.method === 'GET' && req.url.startsWith('/api/v1/resources')) return send(200, { resources: listed, next_cursor: null });
             if (req.url !== '/api/v1/resources/control' || req.method !== 'POST') return send(404, { type: 'about:blank', title: 'Not found', status: 404, code: 'route.not_found' });
             const token = String(req.headers.authorization || '').replace(/^Bearer /, '');
             const v = serviceAuth.verifyServiceToken(token, { publicKey: network.publicPem, issuer: network.url, audience: 'openvibe.media' });
@@ -46,6 +49,7 @@ async function startAuthority() {
     return {
         url: `http://127.0.0.1:${server.address().port}`, seen,
         bind(n) { network = n; },
+        list(rows) { listed = rows; },
         close: () => new Promise((r) => server.close(r)),
     };
 }
@@ -228,6 +232,39 @@ function registryOf(list) {
         assert.strictEqual(forOther.status, 403);
         const row = await db.maybe('SELECT actor_subject FROM services_control_log WHERE project_id = $1', [project]);
         assert.strictEqual(row.actor_subject, `user:${owner.subject}`);
+    });
+
+    await check('the console: an admin suspends what they own from the resources page; delete asks first; a viewer sees no actions', async () => {
+        const owner = t.network.addUser('console-owner');
+        const viewer = t.network.addUser('console-viewer');
+        const project = await t.project(owner, 'Console project');
+        t.network.state.members.get(project).set(viewer.subject, 'viewer');
+        const mine = resources.format({ service: 'media', project_id: project, type: 'object', id: ids.newId('media') });
+        const now = new Date().toISOString();
+        media.list([{ id: mine.split('/').pop(), kind: 'media.object', service: 'media', project_id: project, owner: { type: 'user', id: owner.subject },
+            name: 'clip.mp4', state: 'active', created_at: now, updated_at: now, ovrn: mine }]);
+        const page = await t.get(`/projects/${project}/resources`, { as: owner });
+        assert.strictEqual(page.status, 200);
+        assert.ok(page.text.includes('<th>Actions</th>') || page.text.includes('Actions'), 'an Actions column');
+        assert.ok(page.text.includes('value="suspend"') && page.text.includes('value="delete"'));
+        const seenBefore = media.seen.length;
+        const suspended = await t.get(`/projects/${project}/resources/control`, { as: owner, form: { resource: mine, action: 'suspend' } });
+        assert.strictEqual(suspended.status, 303, suspended.text.slice(0, 300));
+        assert.match(suspended.headers.get('location'), /done=Suspended/);
+        const sent = media.seen.at(-1).body;
+        assert.deepStrictEqual([sent.action, sent.resource, sent.project_id], ['suspend', mine, project]);
+        assert.deepStrictEqual(sent.on_behalf_of, { type: 'user', id: owner.subject });
+        const ask = await t.get(`/projects/${project}/resources/control`, { as: owner, form: { resource: mine, action: 'delete' } });
+        assert.strictEqual(ask.status, 200);
+        assert.ok(ask.text.includes('Delete this resource?'));
+        assert.strictEqual(media.seen.length, seenBefore + 1, 'asking to delete sends nothing');
+        const deleted = await t.get(`/projects/${project}/resources/control`, { as: owner, form: { resource: mine, action: 'delete', confirm: 'yes' } });
+        assert.strictEqual(deleted.status, 303);
+        assert.strictEqual(media.seen.at(-1).body.action, 'delete');
+        const theirs = await t.get(`/projects/${project}/resources`, { as: viewer });
+        assert.ok(!theirs.text.includes('value="suspend"'), 'a viewer gets no controls');
+        assert.strictEqual((await t.get(`/projects/${project}/resources/control`, { as: viewer, form: { resource: mine, action: 'suspend' } })).status, 403);
+        media.list([]);
     });
 
     await check('one audit row per accepted request (a replay too); neither table holds params or a token', async () => {
