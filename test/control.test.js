@@ -88,10 +88,10 @@ function registryOf(list) {
     const prj = ids.newId('project');
     const object = resources.format({ service: 'media', project_id: prj, type: 'object', id: ids.newId('media') });
 
-    await check('only an authority with an active <id>.resource.control takes control requests (Watch, contracts 0.165)', async () => {
+    await check('only an authority with an active <id>.resource.control takes control requests (Watch 0.165, Events 0.168)', async () => {
         const real = createAuthorities(t.config, { log: { warn() {} } });
         assert.ok(real.size() > 0);
-        const TAKES = { watch: 'watch.resource.control' };
+        const TAKES = { watch: 'watch.resource.control', events: 'events.resource.control' };
         for (const a of real.list()) assert.strictEqual(a.control, TAKES[a.id] || null, `${a.id}: the control capability in the pinned contracts`);
     });
 
