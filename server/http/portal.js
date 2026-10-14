@@ -20,6 +20,7 @@
  *   - resources are what each authority answered just now; an authority that could not be read is named
  *     on the page with the problem it gave, never left out silently
  */
+const crypto = require('crypto');
 const express = require('express');
 const { asyncRouter } = require('./router');
 const cache = require('openvibe-shared/cache-policy');
@@ -358,7 +359,7 @@ ${got.data.next_before ? html`<p><a href="/projects/${project.id}/audit?before=$
      * the signed-in person's own resources (`owner`: the ones in no project, each authority filtering by its own owner
      * column, server/resources.js keeping the page to them).
      */
-    async function resourcesPage(req, res, { scope, base, title, crumbs, heading, intro, empty, footer, ownerColumn }) {
+    async function resourcesPage(req, res, { scope, base, title, crumbs, heading, intro, empty, footer, ownerColumn, controls = null }) {
         const services = ctx.index.adapters.map((a) => a.authority.id).sort();
         const q = { service: req.query.service, kind: req.query.kind, cursor: req.query.cursor };
         let filter = { service: null, kind: null, cursor: null };
@@ -382,12 +383,22 @@ ${got.data.next_before ? html`<p><a href="/projects/${project.id}/audit?before=$
             if (o.type === 'user' && o.id === me) return 'you';
             return html`<code class="small">${o.id}</code>`;
         };
+        // Control (ADR-048, plan T13 step 10): an admin or owner acts on what they own, at a service that takes control
+        // requests (its manifest lists an active <id>.resource.control). The service decides; Services shows its answer.
+        const controllable = new Set(ctx.index.adapters.filter((a) => a.authority.control).map((a) => a.authority.id));
+        const c = controls ? csrf(req) : null;
+        const actionsCell = (x) => {
+            if (!controls || !x.ovrn || !controllable.has(x.service) || !(x.owner && x.owner.type === 'user' && x.owner.id === me)) return html`<span class="muted">—</span>`;
+            const act = (action, label) => html`<form method="post" action="/projects/${controls.project.id}/resources/control" class="inline-form">${csrfField(c)}<input type="hidden" name="resource" value="${x.ovrn}"><input type="hidden" name="action" value="${action}"><button type="submit">${label}</button></form>`;
+            return html`${x.state === 'paused' ? act('resume', 'Resume') : act('suspend', 'Suspend')} ${act('delete', 'Delete…')}`;
+        };
         const rows = result ? result.resources.map((x) => [
             html`${x.name || x.id}<br><code class="small">${x.ovrn || x.id}</code>`,
             html`<a href="${link({ kind: x.kind, service: null })}"><code>${x.kind}</code></a>`,
             stateBadge(x.state),
             ...(ownerColumn ? [ownerCell(x.owner)] : []),
             time(x.created_at), time(x.updated_at),
+            ...(controls ? [actionsCell(x)] : []),
         ]) : [];
         const partial = result ? result.partial : [];
         const filtered = Boolean(filter.service || filter.kind);
@@ -401,7 +412,8 @@ ${got.data.next_before ? html`<p><a href="/projects/${project.id}/audit?before=$
 <button type="submit">Show</button>${filtered ? html` <a href="${base}">Clear</a>` : ''}</form>
 ${refused ? notice(html`That filter was refused: ${refused.detail || refused.message} (<code>${refused.code}</code>).`, 'bad') : ''}
 ${partial.length ? notice(html`Not on this page: ${partial.map((p, i) => html`${i ? ', ' : ''}<strong>${p.service}</strong> (<code>${p.code}</code>)`)} could not be read just now. Everything else is here; reload to try ${partial.length === 1 ? 'it' : 'them'} again.`, 'warn') : ''}
-${result ? table(['Resource', 'Kind', 'State', ...(ownerColumn ? ['Owner'] : []), 'Created', 'Updated'], rows, {
+${req.query.done ? notice(String(req.query.done).slice(0, 200), 'ok') : ''}
+${result ? table(['Resource', 'Kind', 'State', ...(ownerColumn ? ['Owner'] : []), 'Created', 'Updated', ...(controls ? ['Actions'] : [])], rows, {
                 empty: filtered ? 'No resources match this filter.' : empty,
             }) : ''}
 ${result && (filter.cursor || result.next_cursor) ? html`<p>${filter.cursor ? html`<a href="${link({})}">First page</a>` : ''}${filter.cursor && result.next_cursor ? ' · ' : ''}${result.next_cursor ? html`<a href="${link({ cursor: result.next_cursor })}">Next page</a>` : ''}</p>` : ''}
@@ -418,9 +430,48 @@ ${result && (filter.cursor || result.next_cursor) ? html`<p>${filter.cursor ? ht
             heading: html`<h1>Resources <small>${project.name}</small></h1>`,
             intro: 'Each OpenVibe service answers for its own resources in this project, read just now and merged here. Services shows them; the service that holds each one owns it.',
             empty: 'No resources in this project yet. Releases, Media objects, event subscriptions and the other things apps in this project create appear here.',
-            footer: html`What you own outside any project (robots, chat rooms, streams) is on <a href="/projects/mine">your resources</a>. Apps read this list with <a href="/docs/capabilities/services.resource.read"><code>services.resource.read</code></a>: <code>GET /api/v1/resources?project=${project.id}</code>.`,
+            footer: html`What you own outside any project (robots, chat rooms, streams) is on <a href="/projects/mine">your resources</a>. Apps read this list with <a href="/docs/capabilities/services.resource.read"><code>services.resource.read</code></a>: <code>GET /api/v1/resources?project=${project.id}</code>. Suspend, resume and delete go to the service that holds the resource (<a href="/docs/capabilities/services.resource.control"><code>services.resource.control</code></a>), for what you own here as an admin or owner.`,
             ownerColumn: true,
+            controls: atLeast(project.role, 'admin') ? { project } : null,
         });
+    });
+
+    // One control operation from the console (ADR-048): the person's own request, made through server/domain/control.js
+    // exactly as POST /api/v1/resources/control makes it (idempotency, the sensitive-action gate, the log and audit).
+    // Delete asks first. The service that holds the resource decides; its answer is shown as it is.
+    const CONSOLE_ACTIONS = { suspend: 'Suspended', resume: 'Resumed', delete: 'Deleted' };
+    r.post('/:project/resources/control', idParams, B('services.resource.control'), form, guard, async (req, res) => {
+        const project = await loadProject(req, res);
+        if (!project) return;
+        const back = `/projects/${project.id}/resources`;
+        if (!atLeast(project.role, 'admin')) return page(req, res, { title: 'Not allowed', body: html`<h1>Not allowed</h1><p>Only an admin or owner of this project acts on its resources here.</p><p><a href="${back}">Back</a></p>` }, 403);
+        const b = req.body || {};
+        const action = String(b.action || '');
+        const resource = String(b.resource || '').slice(0, 300);
+        if (!CONSOLE_ACTIONS[action]) return page(req, res, { title: 'Not done', body: html`<h1>Not done</h1><p>Suspend, resume or delete.</p><p><a href="${back}">Back</a></p>` }, 422);
+        if (action === 'delete' && b.confirm !== 'yes') {
+            return page(req, res, {
+                title: 'Delete?', crumbs: [{ label: 'Projects', href: '/projects' }, { label: project.name, href: back }, { label: 'Delete' }],
+                body: html`<h1>Delete this resource?</h1><p><code>${resource}</code></p><p>The service that holds it deletes it. This cannot be undone here.</p>
+<form method="post" action="/projects/${project.id}/resources/control" class="inline-form">${csrfField(csrf(req))}<input type="hidden" name="resource" value="${resource}"><input type="hidden" name="action" value="delete"><input type="hidden" name="confirm" value="yes"><button type="submit">Delete it</button></form> <a href="${back}">Cancel</a>`,
+            });
+        }
+        const request = { action, resource, project_id: project.id, idempotency_key: `portal-${crypto.randomBytes(12).toString('hex')}` };
+        let result;
+        try {
+            const check = require('openvibe-contracts').resources.checkControlRequest(request);
+            if (!check.valid) throw new ServiceError(400, 'control.bad_request', 'that is not a resource of this project');
+            result = await ctx.control.run(request, { kind: 'user', subject: req.viewer.subject });
+        } catch (err) {
+            if (!(err instanceof ServiceError)) throw err;
+            return page(req, res, { title: 'Not done', body: html`<h1>Not done</h1><p>${err.detail || err.message} (<code>${err.code}</code>)</p><p><a href="${back}">Back</a></p>` }, err.status || 400);
+        }
+        if (result.state === 'done' || result.state === 'pending') {
+            return res.redirect(303, `${back}?done=${encodeURIComponent(`${CONSOLE_ACTIONS[action]}${result.state === 'pending' ? ' (the service finishes it shortly)' : ''}: ${resource}`)}`);
+        }
+        const why = result.confirmation_required ? `It needs its owner's approval first (${result.confirmation_required.reason}).`
+            : result.problem ? `${result.problem.detail || result.problem.title || ''} (${result.problem.code || result.problem.status})` : result.state;
+        return page(req, res, { title: 'Not done', body: html`<h1>The service did not do it</h1><p>${why}</p><p><a href="${back}">Back to the resources</a></p>` }, 200);
     });
 
     // ── Usage (WS-N task 4): Network's per-day numbers from the services' rollups ──
