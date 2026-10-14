@@ -54,6 +54,7 @@ const INTERNAL = [`http://127.0.0.1:3000${PROBE}`, `http://2130706433${PROBE}`, 
         const REVIEWED = {
             'server/auth/keys.js': 'no request itself; openvibe-sdk/auth fetches the JWKS',
             'server/authorities/adapter.js': 'each authority\'s /api/v1/resources at the internalOrigin of its pinned contracts manifest (or a SERVICES_<ID>_URL override): never a caller-chosen URL',
+            'server/clients/confirmations.js': 'Network\'s /internal/confirmations (configured OV_NETWORK internal URL), with Services\' own service token',
             'server/network.js': 'Network\'s developer projects API (configured OV_NETWORK_URL), with the caller\'s own token',
             'server/auth/sso.js': 'Network OAuth token and revoke (configured)',
             'server/domain/limits.js': 'the services\' /limits.json (configured internal URLs)',

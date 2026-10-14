@@ -11,12 +11,13 @@
  *   /projects         the signed-in console over Network's projects API (http/portal.js)
  *   /releases/:id/*   release actions (http/portal.js)
  *   /api/v1/resources, /api/v1/authorities   the merged resource index over every authority (api/v1.js)
+ *   /api/v1/resources/control                one control operation, routed to the owning authority (api/v1.js)
  *   /api/v1           the release API and the docs' JSON (http/api.js)
  *   /auth/*           Network SSO with PKCE (auth/sso.js)
  *   /api/health, /api/ready, /release.json, /metrics (loopback only)
  *
- * createApp({ config, store, now, fetchImpl, log, keys, membership, authorities, tokens, index, registry,
- *             limitsNow, actorLimits, indexnow, valkey }) → { app, ctx }
+ * createApp({ config, store, now, fetchImpl, log, keys, membership, authorities, tokens, index, confirmations,
+ *             registry, limitsNow, actorLimits, indexnow, valkey }) → { app, ctx }
  */
 const path = require('path');
 const express = require('express');
@@ -40,6 +41,8 @@ const { createAuthorityTokens } = require('./authorities/tokens');
 const { createResourceIndexService } = require('./resources');
 const { createSelfAuthority } = require('./registry/self-authority');
 const { v1Router } = require('./api/v1');
+const { createConfirmations } = require('./clients/confirmations');
+const { createControl } = require('./domain/control');
 const { generate } = require('./docs/generate');
 const { createTrust } = require('./domain/trust');
 const { createReleases } = require('./domain/releases');
@@ -103,8 +106,12 @@ async function createApp(opts = {}) {
     const userAuth = createUserAuth(config, keys);
     const membership = opts.membership || createMembership(config, { fetchImpl: fetchImpl || globalThis.fetch });
     const apiAuth = createApiAuth({ config, keys, userAuth, membership });
+    // Control operations (plan T13 step 10): forwarded through the index's authority adapters, sensitive ones gated on
+    // Network's confirmations, every request in services_control_log and services_audit.
+    const confirmations = opts.confirmations || createConfirmations(config, { tokens, fetchImpl: fetchImpl || globalThis.fetch });
+    const control = createControl({ store, index, confirmations, log });
 
-    const ctx = { config, store, docs, keys, sso, network, outbox, trust, releases, playground, archiver, limits, indexnow, authorities, tokens, index, apiAuth, log };
+    const ctx = { config, store, docs, keys, sso, network, outbox, trust, releases, playground, archiver, limits, indexnow, authorities, tokens, index, apiAuth, control, log };
 
     const app = express();
     app.disable('x-powered-by');
@@ -184,7 +191,7 @@ async function createApp(opts = {}) {
         express.json({ limit: INDEX_JSON_LIMIT }),
         (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); },
         apiAuth.middleware,
-        v1Router({ config, apiAuth, index, authorities }));
+        v1Router({ config, apiAuth, index, authorities, control }));
     app.use('/api/v1', (req, res, next) => (/^\/(resources|authorities)(\/|$)/.test(req.path) ? kernel(req, res, next) : next()));
 
     // ── Who is asking (verified offline; refreshed when expired) ──

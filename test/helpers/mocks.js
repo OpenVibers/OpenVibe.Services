@@ -13,6 +13,10 @@
  *             answers what setUsage() stored for the project, or an empty network.project-usage-result@1.
  *             POST /api/v1/projects/:project/export-tokens as Network mints them (owner/admin only,
  *             sub app:app_<project ULID>, read-only caps, purpose export), recorded in exportTokens.
+ *             /internal/confirmations (WS-Z2, Network's server/developer/confirmations.js internalRouter): create and
+ *             consume with a service token for openvibe.network holding network.confirmation.manage, each service
+ *             seeing only its own; addAgent(owner) seeds an agent, decideConfirmation(id, state) is the owner's
+ *             approve/deny in their inbox, setStandingRule(agent, capability) an 'always' rule.
  *   Events    POST /api/v1/events: verifies the app token (openvibe-contracts), needs the capability;
  *             GET /api/v1/events (pull, events.app.read): the token's project and env only, paged
  *             like Events (opaque cursors: after=, next_cursor, latest_cursor); addAppEvent() seeds it
@@ -63,6 +67,7 @@ async function startNetwork({ sandboxAudiences = ['openvibe.events', 'openvibe.m
         users: new Map(), byUsername: new Map(), projects: new Map(), members: new Map(), apps: new Map(), creds: new Map(),
         grants: new Map(), quotas: new Map(), usage: new Map(), audit: [], services: new Map(), refresh: new Map(),
         catalog: null, down: false, requests: [], tokenRequests: [], exportTokens: [], exportTtl: 300,
+        agents: new Map(), confirmations: new Map(), standingRules: new Set(),
     };
     let issuer = null;
     let nextUserId = 1;
@@ -248,6 +253,41 @@ async function startNetwork({ sandboxAudiences = ['openvibe.events', 'openvibe.m
     }
     const res204 = (json) => json(204, {});
 
+    // Network's /internal/confirmations, the parts a service uses: create and consume (server/developer/confirmations.js).
+    const confirmationView = (c) => ({ id: c.id, owner: { type: 'user', id: c.owner }, requested_by: { type: 'agent', id: c.agent_id }, capability: c.capability,
+        summary: c.summary, details: c.details, resources: [], state: c.state, expires_at: c.expires_at, created_at: c.created_at });
+    function confirmationsApi(req, raw, json, url) {
+        const v = serviceAuth.verifyServiceToken(String(req.headers.authorization || '').replace(/^Bearer /, ''), { publicKey: publicPem, issuer, audience: 'openvibe.network' });
+        if (!v.ok) return problem(json, 401, v.code || 'token.invalid', 'a service token for openvibe.network');
+        if (!(v.claims.cap || []).includes('network.confirmation.manage')) return problem(json, 403, 'capability.denied', 'network.confirmation.manage not granted');
+        const audience = `openvibe.${String(v.claims.sub).replace(/^svc:/, '')}`;
+        let body = {};
+        try { body = raw.length ? JSON.parse(raw.toString('utf8')) : {}; } catch { return problem(json, 400, 'request.malformed_json', 'bad JSON'); }
+        const parts = url.pathname.replace(/^\/internal\/confirmations\/?/, '').split('/').filter(Boolean);
+        if (!parts.length) {
+            const by = body.requested_by || {};
+            if (by.type !== 'agent') return problem(json, 422, 'confirmation.invalid', "requested_by is { type: 'agent', id: 'agt_…' }");
+            const agent = st.agents.get(by.id);
+            if (!agent) return problem(json, 404, 'agent.not_found', 'no such agent');
+            if (`openvibe.${String(body.capability).split('.')[0]}` !== audience) return problem(json, 403, 'confirmation.wrong_audience', "the capability is not the caller's");
+            if (!/^[0-9a-f]{64}$/.test(String(body.request_digest))) return problem(json, 422, 'confirmation.invalid', 'request_digest is a lowercase hex SHA-256');
+            const ruled = st.standingRules.has(`${agent.id} ${body.capability}`);
+            const now = new Date().toISOString();
+            const c = { id: ids.newId('confirmation'), agent_id: agent.id, owner: agent.owner, capability: body.capability, audience, summary: body.summary, details: body.details || {},
+                request_digest: body.request_digest, state: ruled ? 'approved' : 'pending', used_at: null, created_at: now, expires_at: new Date(Date.now() + 900e3).toISOString() };
+            st.confirmations.set(c.id, c);
+            return json(ruled ? 200 : 201, { confirmation: confirmationView(c) });
+        }
+        const c = st.confirmations.get(parts[0]);
+        if (!c || c.audience !== audience) return problem(json, 404, 'confirmation.not_found', 'no such confirmation');
+        if (parts[1] !== 'consume') return problem(json, 404, 'route.not_found', 'no such route');
+        if (c.used_at) return problem(json, 409, 'confirmation.used', 'the confirmation was already used');
+        if (c.state !== 'approved') return problem(json, 409, 'confirmation.not_pending', `confirmation is ${c.state}`);
+        if (c.request_digest !== String(body.request_digest)) return problem(json, 409, 'confirmation.mismatch', 'the approval is for another action');
+        c.used_at = new Date().toISOString();
+        return json(200, { confirmation: confirmationView(c), used_at: c.used_at });
+    }
+
     function mintApp(a, audience, cap) {
         const now = Math.floor(Date.now() / 1000);
         return serviceAuth.signServiceToken({ iss: issuer, sub: `app:${a.id}`, actor_type: 'app', aud: [audience], cap, ns: [a.project_id], project_id: a.project_id, env: a.environment, iat: now, exp: now + 300, jti: `tok_${crypto.randomBytes(8).toString('hex')}` }, privatePem);
@@ -305,6 +345,7 @@ async function startNetwork({ sandboxAudiences = ['openvibe.events', 'openvibe.m
             if (!wanted.length) return json(400, { error: 'invalid_scope', error_description: `no grants for audience ${body.audience}` });
             return json(200, { access_token: mintApp(a, body.audience, wanted), token_type: 'Bearer', expires_in: 300, scope: wanted.join(' ') });
         }
+        if (url.pathname.startsWith('/internal/confirmations') && req.method === 'POST') return confirmationsApi(req, raw, json, url);
         if (url.pathname.startsWith('/api/v1/projects')) {
             const u = userFrom(req);
             if (u === 'expired') return problem(json, 401, 'auth.expired', 'access token expired; refresh it');
@@ -328,6 +369,11 @@ async function startNetwork({ sandboxAudiences = ['openvibe.events', 'openvibe.m
         setQuota(projectId, capability, limit, window, unit) { st.quotas.set(`${projectId} ${capability}`, { project_id: projectId, capability, limit, window, unit, updated_at: new Date().toISOString() }); },
         setCatalog(list) { st.catalog = list; },
         setDown(v) { st.down = v; },
+        /** An agent its owner (usr_…) delegated grants to; the owner decides its confirmations. */
+        addAgent(owner) { const id = ids.newId('agent'); st.agents.set(id, { id, owner }); return id; },
+        /** The owner's decision in their inbox: 'approved' or 'denied'. */
+        decideConfirmation(id, state) { st.confirmations.get(id).state = state; },
+        setStandingRule(agentId, capability) { st.standingRules.add(`${agentId} ${capability}`); },
         mintApp: (appId, audience, cap, extra = {}) => { const a = st.apps.get(appId); const now = Math.floor(Date.now() / 1000); return serviceAuth.signServiceToken({ iss: issuer, sub: `app:${a.id}`, actor_type: 'app', aud: [audience], cap, ns: [a.project_id], project_id: a.project_id, env: a.environment, iat: now, exp: now + 300, jti: `tok_${crypto.randomBytes(8).toString('hex')}`, ...extra }, privatePem); },
         close: srv.close,
     };

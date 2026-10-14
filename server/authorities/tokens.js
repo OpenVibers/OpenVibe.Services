@@ -30,8 +30,11 @@ function createAuthorityTokens(config, { authorities, fetchImpl = globalThis.fet
 
     return {
         enabled,
-        /** The bearer token for one authority's audience; throws when Network cannot mint it. */
-        get: async (authority) => (client ? client.getToken({ audience: authority.audience }) : null),
+        /**
+         * The bearer token for one authority's audience (its resource.read, or `scope` when named: the control
+         * capability, network.confirmation.manage); throws when Network cannot mint it.
+         */
+        get: async (authority, scope) => (client ? client.getToken({ audience: authority.audience, ...(scope ? { scope } : {}) }) : null),
         /** What a caller may show without a token: the audiences it can mint for, and whether it can. */
         status: () => ({ enabled, client_id: config.oauth.clientId, audiences: authorities.list().map((a) => a.audience) }),
         invalidate: (ctx) => { if (client) client.invalidate(ctx); },

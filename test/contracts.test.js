@@ -14,6 +14,8 @@ const { MANAGE, READ } = require('../server/http/api');
 const { RESOURCE_READ } = require('../server/registry/resource-index');
 const { check, done } = require('./helpers/boot');
 
+const CONTROL = 'services.resource.control';
+
 (async () => {
     const manifest = contracts.services.get('services');
 
@@ -30,7 +32,7 @@ const { check, done } = require('./helpers/boot');
     await check('its capabilities exist, are owned by services, and are the ones the API guards', async () => {
         // services.resource.read (ADR-048, the resource index) is released too. It stays 'planned' until the
         // contracts follow-up flips it after this ships, so only the two release capabilities are active.
-        assert.deepStrictEqual([...manifest.capabilities].sort(), [MANAGE, READ, RESOURCE_READ].sort());
+        assert.deepStrictEqual([...manifest.capabilities].sort(), [MANAGE, READ, RESOURCE_READ, CONTROL].sort());
         for (const id of [MANAGE, READ]) {
             const c = contracts.capabilities.get(id);
             assert.ok(c, id);
@@ -40,6 +42,12 @@ const { check, done } = require('./helpers/boot');
         const resource = contracts.capabilities.get(RESOURCE_READ);
         assert.ok(resource, RESOURCE_READ);
         assert.strictEqual(resource.owner, 'services');
+        // services.resource.control (plan T13 step 10) is first-party and guards POST /api/v1/resources/control.
+        const control = contracts.capabilities.get(CONTROL);
+        assert.ok(control, CONTROL);
+        assert.strictEqual(control.owner, 'services');
+        assert.strictEqual(control.status, 'active');
+        assert.match(fs.readFileSync(path.join(__dirname, '..', 'server', 'auth', 'api.js'), 'utf8'), /resourceControl: 'services\.resource\.control'/);
         const api = fs.readFileSync(path.join(__dirname, '..', 'server', 'http', 'api.js'), 'utf8');
         // The guards are serviceAuth.requireCapability built per request with the key the token names; api.js's
         // createCapabilityAccess is the one factory the release routes and the resource index both guard with.

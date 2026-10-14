@@ -9,7 +9,7 @@
  *                           the button: they stay. created_by is NOT NULL there, so it becomes `deleted` (the resource
  *                           index then reports no owner); published_by, deprecated_by and revoked_by become NULL; the
  *                           resource index's owner becomes NULL
- *   kept                    release_log (append-only by trigger), services_control_log and the trust tiers a staff
+ *   kept                    release_log (append-only by trigger), services_control_log, services_audit and the trust tiers a staff
  *                           member set: the audit trail of who published, revoked, reviewed or changed what, kept for
  *                           accountability (counted as retained)
  *
@@ -32,6 +32,7 @@ const TABLES = [
     { table: 'trust', subject: 'set_by', value: user, file: null, erase: { keep: 'a trust tier names the staff member who set it, for accountability' } },
     { table: 'trust_history', subject: 'set_by', value: user, file: null, erase: { keep: 'the trust history names the staff member who set each tier, for accountability' } },
     { table: 'services_control_log', subject: 'actor_subject', value: (usr) => [usr, user(usr)], file: null, erase: { keep: 'the control-plane audit log, kept for accountability' } },
+    { table: 'services_audit', subject: 'actor', value: user, file: null, erase: { keep: 'the control-plane audit log, kept for accountability' } },
 ];
 
 /** Manifests and releases they created: exported, then made authorless in extraErase (created_by is NOT NULL). */

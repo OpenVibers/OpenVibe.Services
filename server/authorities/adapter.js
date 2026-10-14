@@ -12,7 +12,12 @@
  *                       (ADR-046 section 6) — one authority's failure never fails the whole page.
  *   get(ovrn)           GET /api/v1/resources/:ovrn → { status, body }; a transport failure is
  *                       resources.authority_unavailable (502) in the caller's terms.
+ *   control(request)    POST /api/v1/resources/control through openvibe-sdk/resources' createResourceClient, with a
+ *                       token scoped to the authority's own <id>.resource.control → its common.resource-control-result@1;
+ *                       null when the authority takes no control requests (no active control capability). SDK errors
+ *                       (OpenVibeError: status/code, sdk.timeout, sdk.network_error) propagate to server/resources.js.
  */
+const { createResourceClient } = require('openvibe-sdk/resources');
 const { ServiceError } = require('../util');
 
 const trim = (u) => String(u || '').replace(/\/+$/, '');
@@ -46,7 +51,17 @@ function createAuthorityAdapter(authority, { tokens, fetchImpl = globalThis.fetc
         return { status: res.status, body };
     }
 
-    return { authority, origin: base, fetchAs, get };
+    let client = null;
+    /** One control request to the authority; null when it has no control capability (the caller answers unsupported). */
+    async function control(request) {
+        if (!authority.control) return null;
+        client = client || createResourceClient({
+            origin: base, token: () => tokens.get(authority, authority.control), fetch: fetchImpl, timeoutMs, retries: 1,
+        });
+        return client.control(request);
+    }
+
+    return { authority, origin: base, fetchAs, get, control };
 }
 
 /** The one fetch createResourceIndex fans out through: the URL's own authority adds its token. */

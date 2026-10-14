@@ -4,6 +4,13 @@ Notable changes to OpenVibe.Services. The service is unreleased; everything belo
 
 ## Unreleased
 
+- Control operations (ADR-048, plan T13 step 10): `POST /api/v1/resources/control` behind `services.resource.control` (contracts v0.154.0, was v0.150.0).
+  - It takes a `common.resource-control-request@1` and answers the owning authority's `common.resource-control-result@1`. The request is forwarded through `openvibe-sdk/resources` `createResourceClient`.
+  - Callers: a first-party service token, or a person who owns or administers the project.
+  - Idempotent on `idempotency_key` (`services_control_log`).
+  - Authorities without a control endpoint answer `failed` / `resources.authority_unsupported`. Today that is all of them.
+  - An agent's delete, money or publishing request is refused with `confirmation_required` until its owner approves through Network's WS-Z2 confirmations.
+  - One `services_audit` row per request. Migration `0004_control.sql`, `test/control.test.js`, `test/control-confirmations.test.js`.
 - Account export and deletion (ADR-033): `POST /internal/events` (loopback, `SERVICES_EVENTS_SECRET`) answers network.account.export_requested and network.account.deleted through `server/domain/account-data.js` over `openvibe-sdk/account-data` (SDK v0.37.0, was v0.35.1).
   - **Deleted:** the person's playground and recipe runs.
   - **Authorless:** manifests and releases stay with their project, without the person.
