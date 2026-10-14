@@ -38,6 +38,18 @@ const { usageBody, usageQuery } = require('../render/usage');
 const { listQuery } = require('../api/v1');
 const { ServiceError } = require('../util');
 
+// What the console offers on a resource (ADR-048 control), by kind. The owning service decides; a button it does not
+// take would only be refused. `admins`: the service lets a project's admins act on what its apps made, not only the
+// resource's own person (Actor and Media, contracts 0.169.0).
+const OPEN_TASK = new Set(['queued', 'running', 'verifying']);
+const KIND_ACTIONS = {
+    'watch.watch': { actions: (x) => [x.state === 'paused' ? ['resume', 'Resume'] : ['suspend', 'Suspend'], ['delete', 'Delete…']] },
+    'events.subscription': { actions: (x) => [x.state === 'disabled' ? ['resume', 'Resume'] : ['suspend', 'Suspend']] },
+    'actor.task': { admins: true, actions: (x) => (OPEN_TASK.has(x.state) ? [['stop', 'Stop']] : []) },
+    'media.object': { admins: true, actions: (x) => (x.state === 'deleted' ? [] : [['delete', 'Delete…']]) },
+    default: { actions: (x) => [x.state === 'paused' ? ['resume', 'Resume'] : ['suspend', 'Suspend'], ['delete', 'Delete…']] },
+};
+
 const PRJ_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
 const APP_RE = /^app_[0-9A-HJKMNP-TV-Z]{26}$/;
 const CRD_RE = /^crd_[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -387,10 +399,18 @@ ${got.data.next_before ? html`<p><a href="/projects/${project.id}/audit?before=$
         // requests (its manifest lists an active <id>.resource.control). The service decides; Services shows its answer.
         const controllable = new Set(ctx.index.adapters.filter((a) => a.authority.control).map((a) => a.authority.id));
         const c = controls ? csrf(req) : null;
+        // The page is an admin's (controls); they act on what they own, and on anything of the project at a service that
+        // lets a project's admins act (KIND_ACTIONS `admins`: what its apps made). The service decides either way.
+        const none = html`<span class="muted">—</span>`;
         const actionsCell = (x) => {
-            if (!controls || !x.ovrn || !controllable.has(x.service) || !(x.owner && x.owner.type === 'user' && x.owner.id === me)) return html`<span class="muted">—</span>`;
-            const act = (action, label) => html`<form method="post" action="/projects/${controls.project.id}/resources/control" class="inline-form">${csrfField(c)}<input type="hidden" name="resource" value="${x.ovrn}"><input type="hidden" name="action" value="${action}"><button type="submit">${label}</button></form>`;
-            return html`${x.state === 'paused' ? act('resume', 'Resume') : act('suspend', 'Suspend')} ${act('delete', 'Delete…')}`;
+            if (!controls || !x.ovrn || !controllable.has(x.service)) return none;
+            const kind = KIND_ACTIONS[x.kind] || KIND_ACTIONS.default;
+            const mine = !!(x.owner && x.owner.type === 'user' && x.owner.id === me);
+            if (!mine && !kind.admins) return none;
+            const offered = kind.actions(x);
+            if (!offered.length) return none;
+            const act = ([action, label]) => html`<form method="post" action="/projects/${controls.project.id}/resources/control" class="inline-form">${csrfField(c)}<input type="hidden" name="resource" value="${x.ovrn}"><input type="hidden" name="action" value="${action}"><button type="submit">${label}</button></form>`;
+            return html`${offered.map((o, i) => html`${i ? ' ' : ''}${act(o)}`)}`;
         };
         const rows = result ? result.resources.map((x) => [
             html`${x.name || x.id}<br><code class="small">${x.ovrn || x.id}</code>`,
@@ -439,7 +459,7 @@ ${result && (filter.cursor || result.next_cursor) ? html`<p>${filter.cursor ? ht
     // One control operation from the console (ADR-048): the person's own request, made through server/domain/control.js
     // exactly as POST /api/v1/resources/control makes it (idempotency, the sensitive-action gate, the log and audit).
     // Delete asks first. The service that holds the resource decides; its answer is shown as it is.
-    const CONSOLE_ACTIONS = { suspend: 'Suspended', resume: 'Resumed', delete: 'Deleted' };
+    const CONSOLE_ACTIONS = { suspend: 'Suspended', resume: 'Resumed', stop: 'Stopped', delete: 'Deleted' };
     r.post('/:project/resources/control', idParams, B('services.resource.control'), form, guard, async (req, res) => {
         const project = await loadProject(req, res);
         if (!project) return;
@@ -448,7 +468,7 @@ ${result && (filter.cursor || result.next_cursor) ? html`<p>${filter.cursor ? ht
         const b = req.body || {};
         const action = String(b.action || '');
         const resource = String(b.resource || '').slice(0, 300);
-        if (!CONSOLE_ACTIONS[action]) return page(req, res, { title: 'Not done', body: html`<h1>Not done</h1><p>Suspend, resume or delete.</p><p><a href="${back}">Back</a></p>` }, 422);
+        if (!CONSOLE_ACTIONS[action]) return page(req, res, { title: 'Not done', body: html`<h1>Not done</h1><p>Suspend, resume, stop or delete.</p><p><a href="${back}">Back</a></p>` }, 422);
         if (action === 'delete' && b.confirm !== 'yes') {
             return page(req, res, {
                 title: 'Delete?', crumbs: [{ label: 'Projects', href: '/projects' }, { label: project.name, href: back }, { label: 'Delete' }],
