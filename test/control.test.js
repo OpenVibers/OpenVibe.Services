@@ -88,10 +88,10 @@ function registryOf(list) {
     const prj = ids.newId('project');
     const object = resources.format({ service: 'media', project_id: prj, type: 'object', id: ids.newId('media') });
 
-    await check('only an authority with an active <id>.resource.control takes control requests (Watch 0.165, Events 0.168)', async () => {
+    await check('only an authority with an active <id>.resource.control takes control requests (Watch 0.165, Events 0.168, Actor and Media 0.169)', async () => {
         const real = createAuthorities(t.config, { log: { warn() {} } });
         assert.ok(real.size() > 0);
-        const TAKES = { watch: 'watch.resource.control', events: 'events.resource.control' };
+        const TAKES = { watch: 'watch.resource.control', events: 'events.resource.control', actor: 'actor.resource.control', media: 'media.resource.control' };
         for (const a of real.list()) assert.strictEqual(a.control, TAKES[a.id] || null, `${a.id}: the control capability in the pinned contracts`);
     });
 
@@ -246,7 +246,7 @@ function registryOf(list) {
         const page = await t.get(`/projects/${project}/resources`, { as: owner });
         assert.strictEqual(page.status, 200);
         assert.ok(page.text.includes('<th>Actions</th>') || page.text.includes('Actions'), 'an Actions column');
-        assert.ok(page.text.includes('value="suspend"') && page.text.includes('value="delete"'));
+        assert.ok(page.text.includes('value="delete"') && !page.text.includes('value="suspend"'), 'a media object takes delete only');
         const seenBefore = media.seen.length;
         const suspended = await t.get(`/projects/${project}/resources/control`, { as: owner, form: { resource: mine, action: 'suspend' } });
         assert.strictEqual(suspended.status, 303, suspended.text.slice(0, 300));
@@ -262,8 +262,28 @@ function registryOf(list) {
         assert.strictEqual(deleted.status, 303);
         assert.strictEqual(media.seen.at(-1).body.action, 'delete');
         const theirs = await t.get(`/projects/${project}/resources`, { as: viewer });
-        assert.ok(!theirs.text.includes('value="suspend"'), 'a viewer gets no controls');
+        assert.ok(!theirs.text.includes('value="delete"'), 'a viewer gets no controls');
         assert.strictEqual((await t.get(`/projects/${project}/resources/control`, { as: viewer, form: { resource: mine, action: 'suspend' } })).status, 403);
+        media.list([]);
+    });
+
+    await check('the console offers what each kind takes; a project admin acts on what its apps made where the service allows it', async () => {
+        const owner = t.network.addUser('kinds-owner');
+        const project = await t.project(owner, 'Kinds project');
+        const now = new Date().toISOString();
+        const row = (kind, state, extra = {}) => {
+            const [svc, type] = kind.split('.');
+            const id = ids.newId(svc === 'media' ? 'media' : 'task');
+            return { id, kind, service: 'media', project_id: project, name: `${kind} ${state}`, state, created_at: now, updated_at: now,
+                ovrn: resources.format({ service: 'media', project_id: project, type, id }), ...extra };
+        };
+        const appMade = row('media.object', 'ready');
+        const gone = row('media.object', 'deleted', { owner: { type: 'user', id: owner.subject } });
+        media.list([appMade, gone]);
+        const page = (await t.get(`/projects/${project}/resources`, { as: owner })).text;
+        const cell = (x) => page.slice(page.indexOf(x.ovrn), page.indexOf('</tr>', page.indexOf(x.ovrn)));
+        assert.ok(cell(appMade).includes('value="delete"'), 'an admin may delete what the project\'s app stored');
+        assert.ok(!cell(gone).includes('<button'), 'a deleted object offers nothing');
         media.list([]);
     });
 
