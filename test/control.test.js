@@ -84,10 +84,11 @@ function registryOf(list) {
     const prj = ids.newId('project');
     const object = resources.format({ service: 'media', project_id: prj, type: 'object', id: ids.newId('media') });
 
-    await check('every real authority without an active <id>.resource.control takes no control requests', async () => {
+    await check('only an authority with an active <id>.resource.control takes control requests (Watch, contracts 0.165)', async () => {
         const real = createAuthorities(t.config, { log: { warn() {} } });
         assert.ok(real.size() > 0);
-        for (const a of real.list()) assert.strictEqual(a.control, null, `${a.id} lists no active control capability in the pinned contracts`);
+        const TAKES = { watch: 'watch.resource.control' };
+        for (const a of real.list()) assert.strictEqual(a.control, TAKES[a.id] || null, `${a.id}: the control capability in the pinned contracts`);
     });
 
     await check('the gate: anonymous 401, no capability 403, an app token 403, a malformed request 400 — nothing forwarded', async () => {

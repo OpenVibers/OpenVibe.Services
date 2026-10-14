@@ -32,7 +32,11 @@ const CONTROL = 'services.resource.control';
     await check('its capabilities exist, are owned by services, and are the ones the API guards', async () => {
         // services.resource.read (ADR-048, the resource index) is released too. It stays 'planned' until the
         // contracts follow-up flips it after this ships, so only the two release capabilities are active.
-        assert.deepStrictEqual([...manifest.capabilities].sort(), [MANAGE, READ, RESOURCE_READ, CONTROL].sort());
+        // Contracts 0.164 also lists three planned capabilities (recipe run, usage and cost reads): declared, not served
+        // or guarded yet, so they stay planned here.
+        const PLANNED = ['services.recipe.run', 'services.usage.read', 'services.cost.read'];
+        assert.deepStrictEqual([...manifest.capabilities].sort(), [MANAGE, READ, RESOURCE_READ, CONTROL, ...PLANNED].sort());
+        for (const id of PLANNED) assert.strictEqual(contracts.capabilities.get(id).status, 'planned', `${id} is not guarded by this code`);
         for (const id of [MANAGE, READ]) {
             const c = contracts.capabilities.get(id);
             assert.ok(c, id);
