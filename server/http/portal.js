@@ -40,13 +40,17 @@ const { ServiceError } = require('../util');
 
 // What the console offers on a resource (ADR-048 control), by kind. The owning service decides; a button it does not
 // take would only be refused. `admins`: the service lets a project's admins act on what its apps made, not only the
-// resource's own person (Actor and Media, contracts 0.169.0).
+// resource's own person (Actor and Media, contracts 0.169.0; Space, 0.170.0).
 const OPEN_TASK = new Set(['queued', 'running', 'verifying']);
 const KIND_ACTIONS = {
     'watch.watch': { actions: (x) => [x.state === 'paused' ? ['resume', 'Resume'] : ['suspend', 'Suspend'], ['delete', 'Delete…']] },
     'events.subscription': { actions: (x) => [x.state === 'disabled' ? ['resume', 'Resume'] : ['suspend', 'Suspend']] },
     'actor.task': { admins: true, actions: (x) => (OPEN_TASK.has(x.state) ? [['stop', 'Stop']] : []) },
     'media.object': { admins: true, actions: (x) => (x.state === 'deleted' ? [] : [['delete', 'Delete…']]) },
+    // Space decides by its own project roles (maintainer or owner), so any admin here may ask (contracts 0.170.0).
+    'space.site': { admins: true, actions: (x) => (x.state === 'deleted' ? [] : [['delete', 'Delete…']]) },
+    'space.deploy': { admins: true, actions: (x) => (x.state === 'deleted' ? [] : [['delete', 'Delete…']]) },
+    'space.domain': { admins: true, actions: () => [['delete', 'Delete…']] },
     default: { actions: (x) => [x.state === 'paused' ? ['resume', 'Resume'] : ['suspend', 'Suspend'], ['delete', 'Delete…']] },
 };
 
