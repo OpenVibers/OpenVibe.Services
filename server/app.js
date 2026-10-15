@@ -120,6 +120,7 @@ async function createApp(opts = {}) {
     require('./render/layout').setRelease(release.release);
     registerServicesGauges(registry, { authorities });
     const metrics = instrument(app, { service: 'services', release: release.release, registry });
+    app.use(require('openvibe-sdk/service').telemetryMiddleware);   // request telemetry: a no-op until server/index.js calls telemetry.init()
     app.locals.metrics = metrics.registry;
     app.locals.ctx = ctx;
     // Per-actor limits (http/actor-limits.js) at /api/v1, the console, release actions and the tools'
