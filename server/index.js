@@ -17,7 +17,8 @@
 const { loadConfig } = require('./config');
 const { openDb, migrate, createStore } = require('./db');
 const { createApp } = require('./app');
-const { gracefulStop } = require('openvibe-sdk/service');
+const { gracefulStop, telemetry } = require('openvibe-sdk/service');
+const { createPgTelemetrySink, startTelemetryRetention } = require('openvibe-sdk/telemetry');
 const { startSubscriptions } = require('openvibe-sdk/account-data');
 const { createRegistry } = require('openvibe-shared/metrics');
 
@@ -30,7 +31,7 @@ function createLifecycle({ server, ctx, exit, signals, extra = [] }) {
     return gracefulStop({
         name: 'Services', server, drainMs: 4000, deadlineMs: 5000, deadlineExitCode: 0, exit, signals,
         stop: [() => ctx.keys.client.stop(), () => ctx.outbox.stop(), ...extra],
-        close: [() => ctx.store.close().catch(() => {})],
+        close: [async () => { if (ctx.telemetryRetention) await ctx.telemetryRetention.stop(); await telemetry.stop(); }, () => ctx.store.close().catch(() => {})],
     });
 }
 
@@ -49,6 +50,10 @@ async function main() {
         console.log(`[Services] docs from openvibe-contracts v${docs.contractsVersion} and openvibe-sdk v${docs.sdkVersion}; authorities ${authorities.size()}: ${authorities.ids().join(', ') || 'none'} (+ services in process); authority tokens ${tokens.enabled ? `client ${config.oauth.clientId}` : 'off (OV_OAUTH_CLIENT_SECRET unset: authorities are reported partial)'}; events relay ${outbox.enabled ? `on → ${config.events.url}` : 'off (events wait in services_events_outbox)'}`);
     });
     server.keepAliveTimeout = 65_000;
+    // Request telemetry (openvibe-sdk/service, plan T1): one aggregated sample per route template, method and status
+    // class each 15 s, stored in this service's telemetry_samples table; rows older than 30 days go daily.
+    telemetry.init({ service: 'services', sink: createPgTelemetrySink({ db: db, log: console }), skipPrefixes: ['/shared'] });
+    ctx.telemetryRetention = startTelemetryRetention({ db: db, log: console });
     server.headersTimeout = 66_000;
     server.requestTimeout = 40_000;
     outbox.start();
