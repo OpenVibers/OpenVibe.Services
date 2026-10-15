@@ -57,6 +57,12 @@ const sdkPkg = require('openvibe-sdk/package.json');
             assert.deepStrictEqual(JSON.parse(raw.text), schema);
         }
         assert.strictEqual((await t.get('/docs/contracts/no.such-contract')).status, 404);
+        // The way the platform writes a contract, name@major, opens its page; another major does not.
+        const one = contracts.catalog[0];
+        const major = one.version.split('.')[0];
+        const versioned = await t.get(`/docs/contracts/${one.id}@${major}`);
+        assert.deepStrictEqual([versioned.status, versioned.headers.get('location')], [301, `/docs/contracts/${encodeURIComponent(one.id)}`]);
+        assert.strictEqual((await t.get(`/docs/contracts/${one.id}@${Number(major) + 7}`)).status, 404);
     });
 
     await check('the capability catalog lists every capability manifest exactly once', async () => {
