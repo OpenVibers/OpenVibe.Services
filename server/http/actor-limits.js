@@ -46,6 +46,8 @@ const BUDGETS = {
     'services.app.manage': { minute: 30, hour: 300 },
     // Rotating or revoking a credential mints or kills a secret: a few at a time.
     'services.app.credential': { minute: 10, hour: 60 },
+    // Setting, deleting or granting a project secret (ADR-056): a few at a time, as credentials.
+    'services.secret.manage': { minute: 10, hour: 60 },
     // Suspend, resume or delete from the resources page (each one reaches the service that holds the resource).
     'services.resource.control': { minute: 20, hour: 200 },
     // A playground run calls Events or Media with the app's own credential: above the runs an hour

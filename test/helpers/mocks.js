@@ -68,6 +68,9 @@ async function startNetwork({ sandboxAudiences = ['openvibe.events', 'openvibe.m
         grants: new Map(), quotas: new Map(), usage: new Map(), audit: [], services: new Map(), refresh: new Map(),
         catalog: null, down: false, requests: [], tokenRequests: [], exportTokens: [], exportTtl: 300,
         agents: new Map(), confirmations: new Map(), standingRules: new Set(),
+        // Project secrets (ADR-056): key "<project> <env> <name>" -> { version, fingerprint, value, grants: Map(service -> grant) }.
+        // The value is kept only so tests can check what reached Network; the mock never answers it.
+        secrets: new Map(),
     };
     let issuer = null;
     let nextUserId = 1;
@@ -171,6 +174,33 @@ async function startNetwork({ sandboxAudiences = ['openvibe.events', 'openvibe.m
             const u = st.usage.get(p.id);
             if (u) return json(200, { ...u, project_id: p.id, env, range });
             return json(200, { project_id: p.id, env, range, generated_at: new Date().toISOString(), last_recorded_at: null, freshness: 'No usage has been recorded for this project yet.', totals: [], daily: [], quotas: [], errors: { total: 0, by_code: [], recent: [] } });
+        }
+        if (rest[0] === 'secrets') {
+            const view = (key, x) => { const [, env, name] = key.split(' '); return { project_id: p.id, environment: env, name, version: x.version, fingerprint: x.fingerprint, grants: [...x.grants.values()], created_at: x.created_at, created_by: x.created_by, updated_at: x.updated_at, updated_by: x.updated_by }; };
+            if (rest.length === 1 && m === 'GET') return json(200, { secrets: [...st.secrets.entries()].filter(([k]) => k.startsWith(`${p.id} `)).map(([k, x]) => view(k, x)) });
+            const [env, name, sub, service] = rest.slice(1);
+            if (!need('admin')) return;
+            if (!['sandbox', 'production'].includes(env) || !/^[a-z][a-z0-9_-]{0,63}$/.test(name || '')) return problem(json, 422, 'secret.invalid', 'bad environment or name');
+            const key = `${p.id} ${env} ${name}`;
+            const at = new Date().toISOString();
+            if (!sub && m === 'PUT') {
+                if (typeof body.value !== 'string' || !body.value) return problem(json, 422, 'secret.invalid', 'value must be a non-empty string');
+                const prev = st.secrets.get(key);
+                const x = { version: prev ? prev.version + 1 : 1, fingerprint: crypto.createHash('sha256').update(body.value).digest('hex').slice(0, 12), value: body.value, grants: prev ? prev.grants : new Map(), created_at: prev ? prev.created_at : at, created_by: prev ? prev.created_by : u.subject, updated_at: at, updated_by: u.subject };
+                st.secrets.set(key, x);
+                return json(200, view(key, x));
+            }
+            const x = st.secrets.get(key);
+            if (!x) return problem(json, 404, 'secret.not_found', 'no such secret');
+            if (!sub && m === 'DELETE') { st.secrets.delete(key); return res204(json); }
+            if (sub === 'grants' && m === 'PUT') {
+                const purposes = Array.isArray(body.purposes) ? body.purposes : [];
+                const origins = Array.isArray(body.origins) ? body.origins : [];
+                if (!purposes.length || (purposes.includes('reveal') && !origins.length)) return problem(json, 422, 'secret.invalid', 'reveal names the origins the value may be sent to');
+                x.grants.set(service, { service, purposes: [...purposes].sort(), origins: [...origins].sort(), created_at: at, created_by: u.subject, last_used_at: null });
+                return json(200, view(key, x));
+            }
+            if (sub === 'grants' && m === 'DELETE') { if (!x.grants.delete(service)) return problem(json, 404, 'secret.grant_not_found', 'no grant'); return res204(json); }
         }
         if (rest[0] === 'audit' && m === 'GET') { if (!role || RANK[role] < RANK.admin) { if (!staff) return problem(json, 403, 'project.forbidden', 'requires admin role'); } return json(200, { entries: st.audit.filter((e) => e.project_id === p.id).slice().reverse(), next_before: null }); }
         if (rest[0] === 'apps') {

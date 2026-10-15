@@ -248,7 +248,7 @@ ${archived ? notice('This project is archived: every app in it is revoked.', 'ba
 <dt>Environments</dt><dd>${envs.join(', ')}${project.environment_policy === 'sandbox' ? html` <span class="muted small">(production apps need staff to enable production for this project)</span>` : ''}</dd>
 <dt>Allowance</dt><dd>${(project.allowance || []).length ? html`<ul class="plain">${project.allowance.map((id) => html`<li><a href="/docs/capabilities/${id}"><code>${id}</code></a></li>`)}</ul>` : html`<span class="muted">empty: staff decide which capabilities this project's apps may hold</span>`}</dd>
 <dt>Created</dt><dd>${time(project.created_at)}</dd></dl>
-<p><a href="/projects/${project.id}/resources">Resources</a>${atLeast(role, 'admin') || req.viewer.staff ? html` · <a href="/projects/${project.id}/usage">Usage, quotas and errors</a> · <a href="/projects/${project.id}/audit">Audit log</a>` : ''}</p>
+<p><a href="/projects/${project.id}/resources">Resources</a> · <a href="/projects/${project.id}/secrets">Secrets</a>${atLeast(role, 'admin') || req.viewer.staff ? html` · <a href="/projects/${project.id}/usage">Usage, quotas and errors</a> · <a href="/projects/${project.id}/audit">Audit log</a>` : ''}</p>
 
 <h2>Apps</h2>
 ${apps.ok ? table(['App', 'Environment', 'Type', 'Grants', 'Created'], (apps.data.apps || []).map((a) => [
@@ -573,6 +573,89 @@ ${result && (filter.cursor || result.next_cursor) ? html`<p>${filter.cursor ? ht
         const used = new Set((got.data.totals || []).map((t) => t.service));
         const answers = limits ? await Promise.all(limits.sources.filter((src) => used.has(src.service)).map(async (src) => ({ src, ...(await limits.read(src)) }))) : [];
         page(req, res, { title: `Usage · ${project.name}`, crumbs, body: usageBody({ project, usage: got.data, limits: answers, query }) });
+    });
+
+    // ── Secrets (ADR-056) ───────────────────────────────────
+    // Network keeps them; a value passes through this process once, on its way to Network, and is never shown, stored
+    // or logged here. Members and staff see metadata; admins and owners set, delete and grant.
+    const SECRET_NAME_RE = /^[a-z][a-z0-9_-]{0,63}$/;
+    const SECRET_ENVS = ['sandbox', 'production'];
+    const SERVICE_ID_RE = /^[a-z][a-z0-9-]{1,39}$/;
+    const secretPath = (req) => `/projects/${req.params.project}/secrets`;
+    const secretParams = (req, res, next) => {
+        const { env, name, service } = req.params;
+        if ((env && !SECRET_ENVS.includes(env)) || (name && !SECRET_NAME_RE.test(name)) || (service && !SERVICE_ID_RE.test(service))) return page(req, res, { title: 'Not found', body: html`<h1>Not found</h1>` }, 404);
+        next();
+    };
+    r.get('/:project/secrets', idParams, async (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        const project = await loadProject(req, res);
+        if (!project) return;
+        const got = await net(req, res, (t) => network.projects.secrets(t, project.id));
+        if (!got.ok) return problemPage(req, res, got.problem, { title: 'Secrets', back: back(req) });
+        const list = got.data.secrets || [];
+        const admin = atLeast(project.role, 'admin') && !project.archived_at;
+        const envs = (project.environments || ['sandbox']).filter((e) => SECRET_ENVS.includes(e));
+        const c = csrf(req);
+        const grantCell = (s) => (s.grants.length ? html`<ul class="plain">${s.grants.map((g) => html`<li><code>${g.service}</code> ${g.purposes.join(' + ')}${g.origins.length ? html` <span class="muted small">to ${g.origins.join(', ')}</span>` : ''}<br><span class="muted small">${g.last_used_at ? html`last used ${time(g.last_used_at)}` : 'not used yet'}</span>${admin ? html` <form method="post" action="${secretPath(req)}/${s.environment}/${s.name}/grants/${g.service}/revoke" class="inline-form">${csrfField(c)}<button type="submit" class="small">Revoke</button></form>` : ''}</li>`)}</ul>` : html`<span class="muted">no service may use it</span>`);
+        const rows = list.map((s) => [
+            html`<code>${s.name}</code><br><span class="muted small">${s.environment}</span>`,
+            html`v${String(s.version)}<br><span class="muted small">fingerprint <code>${s.fingerprint}</code></span>`,
+            html`${time(s.updated_at)}<br><span class="muted small">${s.updated_by}</span>`,
+            grantCell(s),
+            admin ? html`<details><summary>Grant a service</summary><form method="post" action="${secretPath(req)}/${s.environment}/${s.name}/grants" class="stack">${csrfField(c)}
+<label>Service <input name="service" required pattern="[a-z][a-z0-9-]{1,39}" placeholder="actor" maxlength="40"></label>
+<fieldset><legend>It may</legend><label><input type="checkbox" name="purpose_sign" value="1" checked> sign with it (the value never leaves Network)</label>
+<label><input type="checkbox" name="purpose_reveal" value="1"> receive it, to send to these origins only</label></fieldset>
+<label>Origins (reveal; one https origin a line) <textarea name="origins" rows="2" placeholder="https://api.example.com"></textarea></label>
+<button type="submit">Grant</button></form>
+<form method="post" action="${secretPath(req)}/${s.environment}/${s.name}/delete" class="inline-form">${csrfField(c)}<label><input type="checkbox" name="confirm" value="yes" required> delete ${s.name}</label> <button type="submit" class="danger">Delete</button></form></details>` : '',
+        ]);
+        page(req, res, {
+            title: `Secrets · ${project.name}`,
+            crumbs: [{ label: 'Projects', href: '/projects' }, { label: project.name, href: back(req) }, { label: 'Secrets' }],
+            body: html`<h1>Secrets</h1>${req.query.done ? notice(String(req.query.done).slice(0, 80), 'ok') : ''}
+<p class="lede">Values your project's services use by name: a webhook signing key, a token for your own API. OpenVibe.Network keeps them encrypted. Once set, a value is never shown again, here or anywhere; a service uses it only when you grant it, to sign with it or to send it to the origins you list.</p>
+${table(admin ? ['Name', 'Version', 'Set', 'Who may use it', ''] : ['Name', 'Version', 'Set', 'Who may use it'], rows, { empty: 'No secrets yet.' })}
+${admin ? html`<h2>Set a secret</h2>
+<form method="post" action="${secretPath(req)}" class="stack" autocomplete="off">${csrfField(c)}
+<label>Environment <select name="environment">${envs.map((e) => html`<option value="${e}">${e}</option>`)}</select></label>
+<label>Name <input name="name" required pattern="[a-z][a-z0-9_\-]{0,63}" maxlength="64" placeholder="webhook-signing"></label>
+<label>Value <textarea name="value" required rows="3" maxlength="8192" spellcheck="false" autocomplete="off"></textarea></label>
+<p class="muted small">Setting a name again replaces its value and adds one to its version; its grants stay. The fingerprint tells two values apart without showing either.</p>
+<button type="submit">Save</button></form>` : html`<p class="muted small">Admins and owners set secrets and decide which services may use them.</p>`}
+<p><a href="/docs/adr/ADR-056">How project secrets work</a> · <a href="${back(req)}">Back to the project</a></p>`,
+        });
+    });
+    r.post('/:project/secrets', idParams, B('services.secret.manage'), form, guard, async (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        const b = req.body || {};
+        const env = String(b.environment || '');
+        const name = String(b.name || '');
+        if (!SECRET_ENVS.includes(env) || !SECRET_NAME_RE.test(name) || typeof b.value !== 'string' || !b.value) {
+            return page(req, res, { title: 'Not saved', body: html`<h1>Not saved</h1><p>Choose an environment, a name of lowercase letters, digits, _ or - (starting with a letter) and a value.</p><p><a href="${secretPath(req)}">Back</a></p>` }, 422);
+        }
+        const got = await net(req, res, (t) => network.projects.putSecret(t, req.params.project, env, name, b.value));
+        b.value = undefined;
+        after(req, res, got, secretPath(req), `${name} saved (version ${got.ok ? got.data.version : ''})`);
+    });
+    r.post('/:project/secrets/:env/:name/delete', idParams, secretParams, B('services.secret.manage'), form, guard, async (req, res) => {
+        if ((req.body || {}).confirm !== 'yes') return page(req, res, { title: 'Not deleted', body: html`<h1>Not deleted</h1><p>Tick the box to confirm.</p><p><a href="${secretPath(req)}">Back</a></p>` }, 422);
+        const got = await net(req, res, (t) => network.projects.deleteSecret(t, req.params.project, req.params.env, req.params.name));
+        after(req, res, got, secretPath(req), `${req.params.name} deleted`);
+    });
+    r.post('/:project/secrets/:env/:name/grants', idParams, secretParams, B('services.secret.manage'), form, guard, async (req, res) => {
+        const b = req.body || {};
+        const service = String(b.service || '').trim();
+        const purposes = [b.purpose_sign ? 'sign' : null, b.purpose_reveal ? 'reveal' : null].filter(Boolean);
+        const origins = String(b.origins || '').split(/\s+/).map((s) => s.trim()).filter(Boolean).slice(0, 10);
+        if (!SERVICE_ID_RE.test(service) || !purposes.length) return page(req, res, { title: 'Not granted', body: html`<h1>Not granted</h1><p>Name a service (its id, such as actor) and what it may do.</p><p><a href="${secretPath(req)}">Back</a></p>` }, 422);
+        const got = await net(req, res, (t) => network.projects.putSecretGrant(t, req.params.project, req.params.env, req.params.name, service, { purposes, origins: purposes.includes('reveal') ? origins : [] }));
+        after(req, res, got, secretPath(req), `${service} may ${purposes.join(' and ')} with ${req.params.name}`);
+    });
+    r.post('/:project/secrets/:env/:name/grants/:service/revoke', idParams, secretParams, B('services.secret.manage'), form, guard, async (req, res) => {
+        const got = await net(req, res, (t) => network.projects.deleteSecretGrant(t, req.params.project, req.params.env, req.params.name, req.params.service));
+        after(req, res, got, secretPath(req), `${req.params.service} may no longer use ${req.params.name}`);
     });
 
     // ── Apps ────────────────────────────────────────────────

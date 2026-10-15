@@ -78,6 +78,12 @@ function createNetworkClient({ config, fetchImpl, log = console }) {
         // Usage per day, quotas with their use and recent errors (network.project-usage-result@1; owner/admin).
         usage: (t, p, { days, env } = {}) => call(t, 'GET', `${P(p)}/usage?${new URLSearchParams({ days: String(days || 30), env: env || 'all' })}`),
         audit: (t, p, { before, limit } = {}) => call(t, 'GET', `${P(p)}/audit${before || limit ? `?${new URLSearchParams({ ...(before ? { before: String(before) } : {}), ...(limit ? { limit: String(limit) } : {}) })}` : ''}`),
+        // Project secrets (ADR-056): metadata only; a value goes in and never comes back (admin+ writes).
+        secrets: (t, p) => call(t, 'GET', `${P(p)}/secrets`),
+        putSecret: (t, p, env, name, value) => call(t, 'PUT', `${P(p)}/secrets/${enc(env)}/${enc(name)}`, { value }),
+        deleteSecret: (t, p, env, name) => call(t, 'DELETE', `${P(p)}/secrets/${enc(env)}/${enc(name)}`),
+        putSecretGrant: (t, p, env, name, service, body) => call(t, 'PUT', `${P(p)}/secrets/${enc(env)}/${enc(name)}/grants/${enc(service)}`, body),
+        deleteSecretGrant: (t, p, env, name, service) => call(t, 'DELETE', `${P(p)}/secrets/${enc(env)}/${enc(name)}/grants/${enc(service)}`),
         // A 5-minute read-only token for the project export (owner/admin; Network checks and audits).
         exportToken: (t, p, body) => call(t, 'POST', `${P(p)}/export-tokens`, body),
     };
