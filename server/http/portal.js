@@ -677,7 +677,7 @@ ${admin ? html`<h2>Set a secret</h2>
 <div class="notice warn"><strong>You won't see this secret again.</strong> Copy it into your server's secret store now. Services does not keep it and OpenVibe.Network stores only a hash (credential <code>${credential.id}</code>, ending <code>…${credential.hint}</code>). If you lose it, rotate the credential. Never put it in a browser or a repository.</div>
 ${rotated && previous.length ? html`<p>The previous secret${previous.length > 1 ? 's stay' : ' stays'} valid until ${previous.map((p) => html`${time(p.expires_at)} `)} so you can deploy the new one first.</p>` : ''}
 <h2>Use it</h2>
-<pre><code>const sdk = require('openvibe-sdk');
+<pre tabindex="0"><code>const sdk = require('openvibe-sdk');
 const client = sdk.createClient({
     tokenProvider: sdk.auth.createServiceTokenClient({ clientId: '${app.id}', clientSecret: process.env.OV_CLIENT_SECRET }),
 });</code></pre>
@@ -909,7 +909,7 @@ ${table(['When', 'Playground', 'Credential', 'Outcome', 'Stage', 'HTTP', 'Code',
     function runResult(r) {
         return html`<div class="result ${r.outcome === 'ok' ? 'ok' : 'bad'}" role="status"><p><strong>${r.outcome === 'ok' ? 'Done.' : (r.outcome === 'refused' ? 'Refused.' : 'Failed.')}</strong> ${r.detail}</p>
 <p class="muted small">stage ${r.stage}${r.http_status ? ` · HTTP ${r.http_status}` : ''}${r.code ? html` · <code>${r.code}</code>` : ''}${r.runId ? html` · run <code>${r.runId}</code>` : ''}</p>
-${r.result ? html`<pre><code>${JSON.stringify(r.result, null, 2)}</code></pre>` : ''}</div>`;
+${r.result ? html`<pre tabindex="0"><code>${JSON.stringify(r.result, null, 2)}</code></pre>` : ''}</div>`;
     }
 
     const statusFor = (out) => (out.outcome === 'ok' ? 200 : (out.stage === 'grant' || out.stage === 'app' ? 403 : (out.stage === 'input' ? 422 : (out.stage === 'rate' ? 429 : (out.stage === 'token' ? (out.http_status && out.http_status >= 400 ? out.http_status : 401) : 502)))));

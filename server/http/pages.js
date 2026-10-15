@@ -81,7 +81,7 @@ const services = await ov.registry.services();`;
                 lede: 'One console for everything programmable on OpenVibe: projects, scoped credentials, capability grants, usage and releases, over every service. The reference is generated from the exact contract and SDK versions production runs.',
                 actions: [{ label: 'Create a project', href: '/projects', primary: true }, { label: 'Read the docs', href: '/docs' }],
                 note: 'Open source. Network owns projects, apps, credentials, grants and quotas; this console shows its API with your own sign-in and never stores a secret.',
-                aside: { html: `<pre class="services-hero-code"><code>${showcase.esc(snippet)}</code></pre>` },
+                aside: { html: `<pre tabindex="0" class="services-hero-code"><code>${showcase.esc(snippet)}</code></pre>` },
             }))}
 <div class="notice">Status: alpha. What works and what does not is listed on the <a href="/policy/transparency">transparency page</a>.</div>
 ${raw(showcase.features({
@@ -262,7 +262,7 @@ ${req.query.done ? notice(`Release ${req.query.done}.`, 'ok') : ''}
 ${rel.deprecated_at ? html`<dt>Deprecated</dt><dd>${time(rel.deprecated_at)}: ${rel.deprecation_reason}${rel.replacement ? html` — use <a href="/releases/${rel.replacement}">${rel.replacement}</a>` : ''}</dd>` : ''}
 ${rel.revoked_at ? html`<dt>Revoked</dt><dd>${time(rel.revoked_at)}: ${rel.revocation_reason}</dd>` : ''}</dl>
 ${rel.notes ? html`<h2>Notes</h2><p>${rel.notes}</p>` : ''}
-<h2>Manifest</h2><p class="muted small">Validated with openvibe-contracts ${m ? m.contracts_version : '?'}.</p><pre><code>${m ? JSON.stringify(m.body, null, 2) : ''}</code></pre>
+<h2>Manifest</h2><p class="muted small">Validated with openvibe-contracts ${m ? m.contracts_version : '?'}.</p><pre tabindex="0"><code>${m ? JSON.stringify(m.body, null, 2) : ''}</code></pre>
 ${signedIn ? releaseActions(req, rel) : ''}
 <h2>History</h2>${table(['When', 'Action', 'By'], (await releases.log(rel.id)).map((l) => [time(l.at), l.action, l.actor]))}`,
         });

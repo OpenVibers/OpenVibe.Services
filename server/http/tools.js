@@ -79,7 +79,7 @@ ${table(['Parameter', 'Value'], Object.entries(got).filter(([, v]) => v !== null
 ${got.error ? notice(html`Network returned <code>${got.error}</code>${got.error_description ? html`: ${got.error_description}` : ''}. <code>access_denied</code> means the person declined; <code>interaction_required</code> means <code>prompt=none</code> was sent (apps must not).`, 'warn') : ''}
 ${got.code ? html`<h2>Exchange it (on your server)</h2>
 <p>Send <code>client_secret</code> only for a confidential app, and only from a server — never from a browser.</p>
-<pre><code>curl -X POST ${config.network.url}/oauth/token \\
+<pre tabindex="0"><code>curl -X POST ${config.network.url}/oauth/token \\
   -d grant_type=authorization_code \\
   -d client_id="$CLIENT_ID" \\
   -d client_secret="$CLIENT_SECRET" \\
@@ -117,8 +117,8 @@ ${got.code ? html`<h2>Exchange it (on your server)</h2>
 <button type="submit">Generate</button></form>
 ${sample ? html`<div class="result"><p>A delivery exactly as Events would send it (event types from <code>openvibe-contracts v${docs.contractsVersion}</code>). The envelope ${sample.envelopeValid ? 'validates' : 'does NOT validate'} as events.event-envelope@1. The payload is empty: contracts define no payload schema for this event type yet, and Services does not invent one.</p>
 ${table(['Header', 'Value'], Object.entries(sample.headers).map(([k, v]) => [code(k), code(v)]))}
-<p>Body (byte for byte):</p><pre><code>${sample.body}</code></pre>
-<p>Replay it against your own endpoint (Services never sends requests to your URLs). The v2 timestamp is the time you pressed Generate, so a receiver refuses the replay once it is more than ${webhooks.V2_WINDOW_SEC} seconds old: generate a fresh one, or use it to check that your endpoint does refuse a stale delivery.</p><pre><code>${webhooks.curlFor(sample.headers, sample.body)}</code></pre></div>` : ''}`,
+<p>Body (byte for byte):</p><pre tabindex="0"><code>${sample.body}</code></pre>
+<p>Replay it against your own endpoint (Services never sends requests to your URLs). The v2 timestamp is the time you pressed Generate, so a receiver refuses the replay once it is more than ${webhooks.V2_WINDOW_SEC} seconds old: generate a fresh one, or use it to check that your endpoint does refuse a stale delivery.</p><pre tabindex="0"><code>${webhooks.curlFor(sample.headers, sample.body)}</code></pre></div>` : ''}`,
     });
 
     function verifyResult(v) {
