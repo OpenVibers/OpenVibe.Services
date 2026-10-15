@@ -51,9 +51,9 @@ async function main() {
     });
     server.keepAliveTimeout = 65_000;
     // Request telemetry (openvibe-sdk/service, plan T1): one aggregated sample per route template, method and status
-    // class each 15 s, stored in this service's telemetry_samples table; rows older than 30 days go daily.
-    telemetry.init({ service: 'services', sink: createPgTelemetrySink({ db: db, log: console }), skipPrefixes: ['/shared'] });
-    ctx.telemetryRetention = startTelemetryRetention({ db: db, log: console });
+    // class each minute, stored in this service's telemetry_samples table; rows older than 14 days go daily.
+    telemetry.init({ service: 'services', sink: createPgTelemetrySink({ db: db, log: console }), skipPrefixes: ['/shared'], intervalMs: 60_000 });
+    ctx.telemetryRetention = startTelemetryRetention({ db: db, log: console, olderThanDays: 14 });
     server.headersTimeout = 66_000;
     server.requestTimeout = 40_000;
     outbox.start();
