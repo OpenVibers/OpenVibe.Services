@@ -91,7 +91,9 @@ function registryOf(list) {
     await check('only an authority with an active <id>.resource.control takes control requests (Watch 0.165, Events 0.168, Actor and Media 0.169, Space 0.170, Zone 0.173)', async () => {
         const real = createAuthorities(t.config, { log: { warn() {} } });
         assert.ok(real.size() > 0);
-        const TAKES = { watch: 'watch.resource.control', events: 'events.resource.control', actor: 'actor.resource.control', media: 'media.resource.control', space: 'space.resource.control', zone: 'zone.resource.control' };
+        // Person-owned resources too since 0.176.0: bot, chat, openre and community (ADR-048 amendment 2026-10-15).
+        const TAKES = { watch: 'watch.resource.control', events: 'events.resource.control', actor: 'actor.resource.control', media: 'media.resource.control', space: 'space.resource.control', zone: 'zone.resource.control',
+            bot: 'bot.resource.control', chat: 'chat.resource.control', openre: 'openre.resource.control', community: 'community.resource.control' };
         for (const a of real.list()) assert.strictEqual(a.control, TAKES[a.id] || null, `${a.id}: the control capability in the pinned contracts`);
     });
 

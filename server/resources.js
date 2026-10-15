@@ -174,7 +174,9 @@ function createResourceIndexService({ config, authorities, tokens, self = null, 
      * { service, adapter }, or ServiceError 400 resources.unknown_service.
      */
     function controlOwner(request) {
-        const service = request.resource ? parseOvrn(request.resource).service : String(request.resource_kind || '').split('.')[0];
+        // A project's resource by its OVRN or kind; a person-owned one by its index kind (ADR-048 amendment 2026-10-15).
+        const service = request.resource ? parseOvrn(request.resource).service
+            : String((request.owned && request.owned.kind) || request.resource_kind || '').split('.')[0];
         const adapter = adapterById.get(service);
         if (!adapter) throw new ServiceError(400, 'resources.unknown_service', `${service} is not an authority Services reads`);
         return { service, adapter };
@@ -201,6 +203,7 @@ function createResourceIndexService({ config, authorities, tokens, self = null, 
         if (answer === null) return unsupported();
         const bad = (detail) => controlResult(request, 'failed', { problem: { status: 502, code: 'resources.authority_bad_response', detail } });
         if (!contracts.resources.checkControlResult(answer).valid) return bad(`${service} answered something that is not a common.resource-control-result@1`);
+        if (answer.resource && request.owned) return bad(`${service} answered with a resource name for a person-owned resource`);
         if (answer.resource) {
             const named = contracts.resources.parse(answer.resource);
             if (!named || named.project_id !== request.project_id || named.service !== service) return bad(`${service} answered for a resource outside ${request.project_id}`);

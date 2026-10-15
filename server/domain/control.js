@@ -48,7 +48,7 @@ function canonical(v) {
 const digestOf = (v) => crypto.createHash('sha256').update(canonical(v)).digest('hex');
 
 /** What the request asks for, without its delivery fields (idempotency_key, confirmation_id, trace_id). */
-const ACTION_FIELDS = ['action', 'resource', 'resource_kind', 'project_id', 'params', 'on_behalf_of', 'dry_run'];
+const ACTION_FIELDS = ['action', 'resource', 'resource_kind', 'owned', 'owner', 'project_id', 'params', 'on_behalf_of', 'dry_run'];
 const actionOf = (request) => Object.fromEntries(ACTION_FIELDS.filter((k) => request[k] !== undefined).map((k) => [k, request[k]]));
 
 const actorOf = (principal) => (principal.kind === 'user' ? `user:${principal.subject}` : principal.sub);
@@ -113,13 +113,23 @@ function createControl({ store, index, confirmations, log = console }) {
             }
             onBehalfOf = { type: 'user', id: principal.subject };
         }
+        // A person-owned resource (ADR-048 amendment 2026-10-15) is controlled by its owner: their own user token, or a
+        // first-party service acting for them. Services cannot tell whose an agent is, so agents are not offered these.
+        if (request.owned) {
+            if (onBehalfOf && onBehalfOf.type !== 'user') {
+                throw new ServiceError(403, 'control.person_only', 'a person-owned resource is controlled by its owner; agents cannot act on them yet');
+            }
+            if (!onBehalfOf || onBehalfOf.id !== request.owner.id) {
+                throw new ServiceError(403, 'capability.denied', 'only its owner controls a person-owned resource');
+            }
+        }
         const forward = { ...request };
         delete forward.confirmation_id;
         if (onBehalfOf) forward.on_behalf_of = onBehalfOf;
         const action = actionOf(forward);
         const digest = digestOf(action);
-        const project = request.project_id;
-        const target = request.resource || `kind:${request.resource_kind}`;
+        const project = request.project_id || null;
+        const target = request.resource || (request.owned ? `${request.owned.kind}/${request.owned.id}` : `kind:${request.resource_kind}`);
         const key = request.idempotency_key;
 
         // 1) The idempotency key: claim it, replay its answer, or refuse.
