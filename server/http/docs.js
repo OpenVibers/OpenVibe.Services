@@ -92,6 +92,14 @@ ${table(['Contract', 'Version', 'Owner', 'Visibility', 'Status', 'Compatibility'
     });
 
     r.get('/contracts/:id', (req, res, next) => {
+        // A contract named the way the platform writes it, `<name>@<major>` (actor.task-webhook@1): its page, when that
+        // major is the one documented here.
+        const versioned = /^(.+)@(\d+)$/.exec(String(req.params.id));
+        if (versioned) {
+            const named = docs.contract(versioned[1]);
+            if (named && named.version.split('.')[0] === versioned[2]) return res.redirect(301, `/docs/contracts/${encodeURIComponent(named.id)}`);
+            return next();
+        }
         const c = docs.contract(req.params.id);
         if (!c) return next();
         const major = c.version.split('.')[0];
