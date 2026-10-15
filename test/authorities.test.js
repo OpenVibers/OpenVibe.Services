@@ -17,14 +17,15 @@ const { createAuthorities } = require('../server/authorities');
 const { check, done } = require('./helpers/app');
 
 const quiet = { warn() {}, log() {}, error() {} };
-// Static hosting's index is Space's since contracts 0.150.0 (the engine moved from Host, plan T20).
-const AUTHORITIES = ['actor', 'bot', 'chat', 'community', 'events', 'media', 'network', 'openre', 'space', 'watch'];
+// Static hosting's index is Space's since contracts 0.150.0 (the engine moved from Host, plan T20); Zone's zones since 0.173.0.
+const AUTHORITIES = ['actor', 'bot', 'chat', 'community', 'events', 'media', 'network', 'openre', 'space', 'watch', 'zone'];
 
 async function main() {
-    await check('the pin lists eleven active <id>.resource.read capabilities, ten of them authorities', () => {
+    await check('the pin lists twelve active <id>.resource.read capabilities, eleven of them authorities', () => {
         const ids = contracts.capabilities.manifests.filter((c) => /^([a-z][a-z0-9-]{0,31})\.resource\.read$/.test(c.id) && c.status === 'active').map((c) => c.id).sort();
         assert.deepStrictEqual(ids, ['actor.resource.read', 'bot.resource.read', 'chat.resource.read', 'community.resource.read', 'events.resource.read',
-            'media.resource.read', 'network.resource.read', 'openre.resource.read', 'services.resource.read', 'space.resource.read', 'watch.resource.read']);
+            'media.resource.read', 'network.resource.read', 'openre.resource.read', 'services.resource.read', 'space.resource.read', 'watch.resource.read',
+            'zone.resource.read']);
         assert.strictEqual(contracts.capabilities.get('host.resource.read').status, 'retired', 'Host serves no hosting index since 0.150.0');
         assert.strictEqual(contracts.capabilities.get('codes.resource.read').status, 'retired', 'Codes owns no resources since 0.113.0');
         // services.resource.read is Services' own id; Services is never its own authority (the next check).
@@ -45,6 +46,7 @@ async function main() {
             chat: 'http://127.0.0.1:4400',
             openre: 'http://127.0.0.1:4500',
             community: 'http://127.0.0.1:4200',
+            zone: 'http://127.0.0.1:5050',
         };
         for (const [id, origin] of Object.entries(expected)) {
             const a = registry.get(id);

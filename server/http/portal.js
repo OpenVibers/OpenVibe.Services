@@ -51,6 +51,9 @@ const KIND_ACTIONS = {
     'space.site': { admins: true, actions: (x) => (x.state === 'deleted' ? [] : [['delete', 'Delete…']]) },
     'space.deploy': { admins: true, actions: (x) => (x.state === 'deleted' ? [] : [['delete', 'Delete…']]) },
     'space.domain': { admins: true, actions: () => [['delete', 'Delete…']] },
+    // A zone (OpenVibe.Zone, contracts 0.173.0): delete it and every object in it, for a project admin. The default zone
+    // goes only with its environment, so it offers nothing.
+    'zone.object-zone': { admins: true, actions: (x) => (['deleting', 'deleted'].includes(x.state) || /^default \(/.test(String(x.name || '')) ? [] : [['delete', 'Delete…']]) },
     default: { actions: (x) => [x.state === 'paused' ? ['resume', 'Resume'] : ['suspend', 'Suspend'], ['delete', 'Delete…']] },
 };
 
@@ -66,6 +69,7 @@ const RESOURCES_PER_PAGE = 50;
 const STATE_KIND = {
     ready: 'ok', active: 'ok', published: 'ok', live: 'ok', enabled: 'ok', online: 'ok', open: 'ok',
     draft: 'warn', queued: 'warn', pending: 'warn', paused: 'warn', processing: 'warn', deprecated: 'warn', offline: 'warn',
+    provisioning: 'warn', deleting: 'warn',
     failed: 'bad', revoked: 'bad', deleted: 'bad', disabled: 'bad', archived: 'bad', suspended: 'bad',
 };
 const stateBadge = (s) => badge(s, STATE_KIND[s] || '');
