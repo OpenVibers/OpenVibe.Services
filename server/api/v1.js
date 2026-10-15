@@ -98,7 +98,8 @@ function v1Router({ config, apiAuth, index, authorities, control }) {
             throw new ServiceError(400, 'control.bad_request', 'the body is not a valid common.resource-control-request@1',
                 { errors: check.errors.slice(0, 20).map((e) => ({ path: String(e.path || e.instancePath || ''), message: String(e.message || 'invalid') })) });
         }
-        await apiAuth.authorizeControl(req, request.project_id);
+        // A project's resource: the caller must control that project. A person's own resource: only its owner (control.run).
+        if (!request.owned) await apiAuth.authorizeControl(req, request.project_id);
         const result = await control.run(request, req.principal);
         res.status(httpStatusOf(result)).json(result);
     });

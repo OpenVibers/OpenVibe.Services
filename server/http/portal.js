@@ -57,6 +57,16 @@ const KIND_ACTIONS = {
     default: { actions: (x) => [x.state === 'paused' ? ['resume', 'Resume'] : ['suspend', 'Suspend'], ['delete', 'Delete…']] },
 };
 
+// What a person may do to their own resources outside any project (ADR-048 amendment 2026-10-15), by kind: the
+// authority's <service>.resource.control lists the same actions and checks that they are the owner.
+const OWNED_ACTIONS = {
+    'bot.robot': (x) => (x.state === 'estopped' ? [['resume', 'Resume']] : [['stop', 'Stop']]),
+    'chat.room': () => [['archive', 'Archive…']],
+    'openre.stream': (x) => (x.state === 'disabled' ? [['resume', 'Resume']] : [['suspend', 'Suspend']]),
+    'community.paste': () => [['delete', 'Delete…']],
+};
+const OWNED_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
+
 const PRJ_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
 const APP_RE = /^app_[0-9A-HJKMNP-TV-Z]{26}$/;
 const CRD_RE = /^crd_[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -173,9 +183,48 @@ ${table(['Project', 'Your role', 'Environments', 'Apps', 'Created'], list.map((p
             heading: html`<h1>Your resources</h1>`,
             intro: 'What you own yourself, outside any project: your robots, chat rooms, streams, watches, Actor tasks, pastes, forum spaces and the rest. Each OpenVibe service answers for its own, read just now and merged here; the service that holds each one owns it.',
             empty: 'Nothing of yours outside a project yet. A robot you add on OpenVibe.Bot, a room you open on OpenVibe.Chat, a stream on OpenRestream, a watch on OpenVibe.Watch or a paste on OpenVibe.Community appears here.',
-            footer: html`Resources in a project are on that project's page: <a href="/projects">your projects</a>.`,
+            footer: html`Resources in a project are on that project's page: <a href="/projects">your projects</a>. Stop or resume a robot, archive a chat room, suspend or resume a stream and delete a paste here: the service that holds each one does it, after checking it is yours.`,
             ownerColumn: false,
+            controls: { owned: true },
         });
+    });
+
+    // One control operation on your own resource (ADR-048 amendment 2026-10-15), through server/domain/control.js like
+    // every other: the service that holds it checks you are its owner and decides. Archive and delete ask first.
+    const OWNED_DONE = { stop: 'Stopped', resume: 'Resumed', suspend: 'Suspended', archive: 'Archived', delete: 'Deleted' };
+    r.post('/mine/resources/control', B('services.resource.control'), form, guard, async (req, res) => {
+        const back = '/projects/mine';
+        const b = req.body || {};
+        const action = String(b.action || '');
+        const kind = String(b.kind || '');
+        const id = String(b.id || '');
+        const notDone = (detail, status = 422) => page(req, res, { title: 'Not done', body: html`<h1>Not done</h1><p>${detail}</p><p><a href="${back}">Back</a></p>` }, status);
+        if (!OWNED_ACTIONS[kind] || !OWNED_ID_RE.test(id)) return notDone('That is not one of your resources that can be acted on here.');
+        if (!OWNED_DONE[action]) return notDone('Stop, resume, suspend, archive or delete.');
+        if ((action === 'delete' || action === 'archive') && b.confirm !== 'yes') {
+            const what = action === 'delete' ? 'Delete' : 'Archive';
+            return page(req, res, {
+                title: `${what}?`, crumbs: [{ label: 'Projects', href: '/projects' }, { label: 'Your resources', href: back }, { label: what }],
+                body: html`<h1>${what} this?</h1><p><code>${kind}</code> <code>${id}</code></p><p>${action === 'delete' ? 'The service that holds it deletes it. This cannot be undone here.' : 'The room leaves every listing and takes no new messages; its history stays.'}</p>
+<form method="post" action="/projects/mine/resources/control" class="inline-form">${csrfField(csrf(req))}<input type="hidden" name="kind" value="${kind}"><input type="hidden" name="id" value="${id}"><input type="hidden" name="action" value="${action}"><input type="hidden" name="confirm" value="yes"><button type="submit">${what} it</button></form> <a href="${back}">Cancel</a>`,
+            });
+        }
+        const me = { type: 'user', id: req.viewer.subject };
+        const request = { action, owned: { kind, id }, owner: me, on_behalf_of: me, idempotency_key: `portal-${crypto.randomBytes(12).toString('hex')}` };
+        let result;
+        try {
+            const check = require('openvibe-contracts').resources.checkControlRequest(request);
+            if (!check.valid) throw new ServiceError(400, 'control.bad_request', 'that is not one of your resources');
+            result = await ctx.control.run(request, { kind: 'user', subject: req.viewer.subject });
+        } catch (err) {
+            if (!(err instanceof ServiceError)) throw err;
+            return notDone(html`${err.detail || err.message} (<code>${err.code}</code>)`, err.status || 400);
+        }
+        if (result.state === 'done' || result.state === 'pending') {
+            return res.redirect(303, `${back}?done=${encodeURIComponent(`${OWNED_DONE[action]}${result.state === 'pending' ? ' (the service finishes it shortly)' : ''}: ${kind} ${id}`)}`);
+        }
+        const why = result.problem ? `${result.problem.detail || result.problem.title || ''} (${result.problem.code || result.problem.status})` : result.state;
+        return page(req, res, { title: 'Not done', body: html`<h1>The service did not do it</h1><p>${why}</p><p><a href="${back}">Back to your resources</a></p>` }, 200);
     });
 
     r.get('/:project', idParams, async (req, res) => {
@@ -411,6 +460,13 @@ ${got.data.next_before ? html`<p><a href="/projects/${project.id}/audit?before=$
         // lets a project's admins act (KIND_ACTIONS `admins`: what its apps made). The service decides either way.
         const none = html`<span class="muted">—</span>`;
         const actionsCell = (x) => {
+            if (controls && controls.owned) {
+                // Your own resources: only what you own, at a service that takes owned control requests.
+                const offer = OWNED_ACTIONS[x.kind];
+                if (!offer || x.ovrn || !controllable.has(x.service) || !(x.owner && x.owner.type === 'user' && x.owner.id === me)) return none;
+                const act = ([action, label]) => html`<form method="post" action="/projects/mine/resources/control" class="inline-form">${csrfField(c)}<input type="hidden" name="kind" value="${x.kind}"><input type="hidden" name="id" value="${x.id}"><input type="hidden" name="action" value="${action}"><button type="submit">${label}</button></form>`;
+                return html`${offer(x).map((o, i) => html`${i ? ' ' : ''}${act(o)}`)}`;
+            }
             if (!controls || !x.ovrn || !controllable.has(x.service)) return none;
             const kind = KIND_ACTIONS[x.kind] || KIND_ACTIONS.default;
             const mine = !!(x.owner && x.owner.type === 'user' && x.owner.id === me);
