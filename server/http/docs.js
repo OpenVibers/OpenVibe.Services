@@ -65,7 +65,7 @@ function createDocsRoutes(ctx) {
 <li><a href="/policy/rfc"><strong>Decisions</strong></a><span>${docs.adrs.length} architecture decision records</span></li>
 </ul>
 <h2>Install</h2>
-<pre><code>npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/${docs.sdkTag}
+<pre tabindex="0"><code>npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/${docs.sdkTag}
 npm install https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/${docs.contractsTag}</code></pre>
 <p>The SDK is ${docs.sdkLicense}; the contracts are ${docs.contractsLicense}. The SDK release is tested against contracts <code>${docs.sdkContractsRange || 'n/a'}</code>.</p>`,
         });
@@ -103,7 +103,7 @@ ${table(['Contract', 'Version', 'Owner', 'Visibility', 'Status', 'Compatibility'
         const c = docs.contract(req.params.id);
         if (!c) return next();
         const major = c.version.split('.')[0];
-        const fixture = (f, ok) => html`<details${ok ? raw(' open') : ''}><summary>${ok ? 'Valid' : 'Rejected'}: ${f.name}</summary><pre><code>${JSON.stringify(f.body, null, 2)}</code></pre></details>`;
+        const fixture = (f, ok) => html`<details${ok ? raw(' open') : ''}><summary>${ok ? 'Valid' : 'Rejected'}: ${f.name}</summary><pre tabindex="0"><code>${JSON.stringify(f.body, null, 2)}</code></pre></details>`;
         page(req, res, {
             title: `${c.id}@${major}`,
             description: c.description.slice(0, 200),
@@ -127,7 +127,7 @@ ${table(['Field', 'Type', 'Required', 'Description', 'Constraints'], c.fields.ma
 ${c.fixtures.valid.map((f) => fixture(f, true))}${c.fixtures.invalid.map((f) => fixture(f, false))}
 ${!c.fixtures.valid.length && !c.fixtures.invalid.length ? html`<p class="muted">No fixtures ship with this contract.</p>` : ''}
 <h2>Validate</h2>
-<pre><code>const contracts = require('openvibe-contracts');
+<pre tabindex="0"><code>const contracts = require('openvibe-contracts');
 contracts.validate('${c.id}@${major}', value);   // { valid, errors: [{ path, message }] }</code></pre>`,
         });
     });
@@ -276,25 +276,25 @@ ${(doc['x-openvibe-other-bindings'] || []).length ? html`<h2>Other bindings</h2>
 <h2>Where entries come from</h2>
 <p>OpenVibe.Blog watches every running service's release: the <code>release</code> in its <code>/release.json</code>, as OpenVibe.Network's registry reports it. When a release changes, GitHub's compare of the old and new commit gives the commits that shipped. Each one becomes an entry, with the commit message as its text, and batches of them are published as "Patch notes" posts. A service appears once it serves <code>/release.json</code> and its registry entry names its repository.</p>
 <h2>The feed</h2>
-<pre><code>GET https://openvibe.network/api/v1/changelog?service=&lt;id&gt;&amp;limit=&lt;1-100&gt;&amp;before=&lt;cursor&gt;
+<pre tabindex="0"><code>GET https://openvibe.network/api/v1/changelog?service=&lt;id&gt;&amp;limit=&lt;1-100&gt;&amp;before=&lt;cursor&gt;
 → { service, entries: [{ service, sha, short, subject, author, committed_at, deployed_at, major, url, post_id }],
     latest_post: { id, title, url, published_at, entries } | null, posts, next }</code></pre>
 <p>It is public, CORS <code>*</code> and cached for 60 s (stale while the blog is down). Leave <code>service</code> out for the whole network.</p>
 ${sample ? html`<details open><summary>Live sample: the last ${String((sample.entries || []).length)} entries for this site</summary><ul>${(sample.entries || []).map((e) => html`<li><a href="${e.url}"><code>${e.short}</code></a> ${e.subject} ${e.deployed_at ? html`<span class="muted small">(${time(e.deployed_at)})</span>` : ''}</li>`)}</ul></details>`
         : html`<p class="muted">The feed could not be read just now (${failed}); the shape above is what it answers.</p>`}
 <h2>On a server-rendered site</h2>
-<pre><code>const frame = require('openvibe-shared/frame');
+<pre tabindex="0"><code>const frame = require('openvibe-shared/frame');
 frame.shipped({ service: 'myservice', title: 'Recently shipped on MySite' })   // home: pill + recent list
 frame.updatesBody({ service: 'myservice', siteName: 'MySite' })                // the body of your /updates page
 frame.shippedScript()                                                          // the &lt;script&gt; that fills them</code></pre>
 <p>The footer from <code>openvibe-shared/footer</code> already carries the "shipped X ago" line and an Updates link.</p>
 <h2>The markup, if you render it yourself</h2>
-<pre><code>&lt;a data-ov-shipped="latest" data-service="myservice" href="/updates" hidden&gt;&lt;/a&gt;
+<pre tabindex="0"><code>&lt;a data-ov-shipped="latest" data-service="myservice" href="/updates" hidden&gt;&lt;/a&gt;
 &lt;div data-ov-shipped="list" data-service="myservice" data-limit="5" data-more="/updates" data-title="Recently shipped" hidden&gt;&lt;/div&gt;
 &lt;div data-ov-shipped="log" data-service="myservice" data-limit="50"&gt;&lt;/div&gt;</code></pre>
 <p><code>shipped.js</code> (served by every site from its pinned openvibe-shared) mounts every <code>[data-ov-shipped]</code> element: <code>latest</code> is the pill, <code>list</code> the recent changes, and <code>log</code> the full log with days, "Load more" and the Patch notes posts. Elements stay hidden until there is something to show.</p>
 <h2>In a browser app outside the network</h2>
-<pre><code>import { mountFrame } from 'openvibe-sdk/frame';
+<pre tabindex="0"><code>import { mountFrame } from 'openvibe-sdk/frame';
 await mountFrame({ service: 'myapp' });            // navbar and footer, with the shipped line
 await mountFrame({ service: 'myapp', shipped: false });   // without it</code></pre>
 <p>Live's <a href="https://openvibe.live/updates">/updates</a>, <a href="/updates">this site's</a> and <a href="https://openvibe.network/updates">the whole network's</a> are the same component.</p>`,
@@ -516,7 +516,7 @@ ${table(['Module', 'Where', 'Declarations', 'Types file'], docs.sdk.map((m) => [
             body: html`<h1><code>${m.name}</code></h1>${versions()}
 <p class="muted">From <code>${m.typesFile}</code> (${m.browser}). Declarations are shown verbatim.</p>
 <nav class="toc"><ul class="plain">${m.declarations.map((d, i) => html`<li><a href="#d${i}">${d.kind} ${d.name}</a></li>`)}</ul></nav>
-${m.declarations.map((d, i) => html`<section id="d${i}" class="decl"><h2><small>${d.kind}</small> ${d.name}</h2>${d.doc ? html`<p>${d.doc}</p>` : ''}<pre><code>${d.text}</code></pre></section>`)}`,
+${m.declarations.map((d, i) => html`<section id="d${i}" class="decl"><h2><small>${d.kind}</small> ${d.name}</h2>${d.doc ? html`<p>${d.doc}</p>` : ''}<pre tabindex="0"><code>${d.text}</code></pre></section>`)}`,
         });
     });
 

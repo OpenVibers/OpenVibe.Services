@@ -120,6 +120,8 @@ const sdkPkg = require('openvibe-sdk/package.json');
         assert.strictEqual(list.status, 200);
         for (const s of index) assert.ok(list.text.includes(`href="/docs/api/${s.service}"`), `${s.service} is listed`);
         assert.ok((await t.get('/docs')).text.includes('href="/docs/api"'), 'the docs index links it');
+        // Code blocks scroll sideways on a phone, so each is a keyboard stop (axe scrollable-region-focusable).
+        assert.ok(!/<pre(?![^>]*tabindex)[\s>]/.test((await t.get('/docs')).text), 'every <pre> on /docs is focusable');
         const raw = await t.get('/docs/api/tools.json');
         assert.strictEqual(raw.status, 200);
         assert.match(raw.headers.get('content-type'), /application\/vnd\.oai\.openapi\+json/);
