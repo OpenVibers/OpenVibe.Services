@@ -120,10 +120,10 @@ ${raw(showcase.limits({
             }))}
 <section class="sc-sec" aria-labelledby="h-ref"><h2 id="h-ref">Reference</h2>
 <p class="sc-lede">Generated from <code>openvibe-contracts v${docs.contractsVersion}</code> and <code>openvibe-sdk v${docs.sdkVersion}</code>: <a href="/docs/api">API explorer</a> · <a href="/docs/contracts">contracts</a> · <a href="/docs/capabilities">capabilities</a> · <a href="/docs/events">events</a> · <a href="/docs/services">services</a> · <a href="/docs/tools">tools</a> · <a href="/docs/sdk">SDK</a> · <a href="/docs/limits">all limits</a>.</p></section>
-<section class="sc-sec" aria-labelledby="h-rel"><h2 id="h-rel">Recent releases</h2>
+${recent.length ? html`<section class="sc-sec" aria-labelledby="h-rel"><h2 id="h-rel">Recent releases</h2>
 ${table(['App', 'Kind', 'Version', 'Status', 'Trust', 'Published'], recent.map((x) => [
                 html`<a href="/apps/${x.app_id}">${x.name}</a>`, x.kind, html`<a href="/releases/${x.id}">${x.version}</a>`, x.status, x.trust.tier, time(x.published_at),
-            ]), { empty: 'No releases have been published yet.' })}</section>
+            ]))}</section>` : ''}
 ${raw(showcase.cta({ title: 'Start building', text: 'Sign in with your OpenVibe account; your first project takes a minute. Coding with an agent? OpenVibe.Codes routes the task to Claude Code, Codex, OpenCode or your own model.', actions: [{ label: 'Create a project', href: '/projects', primary: true }, { label: 'Code with any agent', href: 'https://openvibe.codes' }] }))}`,
         });
     });
