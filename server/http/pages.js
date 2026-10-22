@@ -15,6 +15,7 @@ const contracts = require('openvibe-contracts');
 const ovServe = require('openvibe-shared/serve');
 const frame = require('openvibe-shared/frame');
 const showcase = require('openvibe-shared/showcase');
+const seo = require('openvibe-shared/seo');
 const cache = require('openvibe-shared/cache-policy');
 const path = require('path');
 const express = require('express');
@@ -25,18 +26,12 @@ const { send } = require('../render/layout');
 const { markdown } = require('../render/markdown');
 const { csrfToken, checkCsrf, sameOrigin } = require('../auth/forms');
 const { TABLES } = require('../db');
+const home = require('./home');
 const { EVENT_TYPES } = require('../events/outbox');
 
 const ROOT = path.join(__dirname, '..', '..');
 const readJson = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } };
 
-
-/** A limit as its service states it: a number with its unit, or unlimited/none. */
-function limitAmount(v, unit) {
-    if (v === null || v === undefined) return 'unlimited';
-    if (v === 0) return 'none';
-    return unit ? `${Number(v).toLocaleString('en-US')} ${unit}` : Number(v).toLocaleString('en-US');
-}
 
 function createPageRoutes(ctx) {
     const { config, docs, releases, trust, network, sso } = ctx;
@@ -44,24 +39,26 @@ function createPageRoutes(ctx) {
     const form = express.urlencoded({ extended: false, limit: '32kb' });
     const PUBLIC_CACHE = cache.htmlHeaders({ maxAge: 300 });
     const page = (req, res, o, status = 200) => send(res, status, { viewer: req.viewer, config, path: req.originalUrl, ...o });
+    // Services up across the network, from Network's public status (read in the background, never awaited here).
+    const networkStatus = home.createNetworkStatus({ url: config.network.internalUrl, enabled: config.nodeEnv !== 'test' });
 
     r.get('/', async (req, res) => {
         const recent = await releases.recentPublic(10);
         // The limits a developer's project really gets, from the service that enforces them (never restated here).
         const eventsSource = ctx.limits && ctx.limits.bySource ? ctx.limits.bySource('events') : null;
         const eventsLimits = eventsSource ? await ctx.limits.read(eventsSource) : null;
-        const limitRows = eventsLimits && eventsLimits.body ? eventsLimits.body.limits.slice(0, 6).map((l) => ({ label: l.label, values: [limitAmount(l.sandbox, l.unit), limitAmount(l.production, l.unit)] })) : [];
-        const snippet = `// openvibe-sdk v${docs.sdkVersion} (install: /docs/sdk)
-const { createClient } = require('openvibe-sdk');
-const { createServiceTokenClient } =
-    require('openvibe-sdk/auth');
+        const limitRows = eventsLimits && eventsLimits.body ? eventsLimits.body.limits.slice(0, 6).map((l) => ({ label: l.label, values: [home.limitAmount(l.sandbox, l.unit), home.limitAmount(l.production, l.unit)] })) : [];
+        // The hero's code runs as written against production with the pinned SDK: public reads need no key
+        // (test/home.test.js runs it against a mock).
+        const snippet = `// openvibe-sdk v${docs.sdkVersion}
+const sdk = require('openvibe-sdk');
+const ov = sdk.createClient();      // public reads need no key
 
-const ov = createClient({
-    tokenProvider: createServiceTokenClient({
-        clientId, clientSecret,
-    }),
-});
-const services = await ov.registry.services();`;
+const search = sdk.search.createSearchClient(ov);
+const { results } = await search.query('go live');
+
+const registry = sdk.registry.createRegistryClient(ov);
+const services = await registry.services();`;
         // The services a project can call: every live service with a generated API reference and at least one
         // capability an app can be granted (Services itself aside), with its tagline from its site block or its
         // product manifest. Read from the pinned contracts, never typed here.
@@ -73,7 +70,7 @@ const services = await ov.registry.services();`;
             .sort((a, b) => ((a.site && a.site.position) ?? 50) - ((b.site && b.site.position) ?? 50) || a.name.localeCompare(b.name));
         page(req, res, {
             index: true, cache: PUBLIC_CACHE,
-            jsonLd: homeJsonLd(config),
+            jsonLd: [...homeJsonLd(config), seo.jsonLd.faq(home.FAQ)],
             styles: [showcase.STYLESHEET],
             body: html`${raw(showcase.hero({
                 eyebrow: 'OpenVibe.Services · the developer platform · alpha',
@@ -84,6 +81,9 @@ const services = await ov.registry.services();`;
                 aside: { html: `<pre tabindex="0" class="services-hero-code"><code>${showcase.esc(snippet)}</code></pre>` },
             }))}
 <div class="notice">Status: alpha. What works and what does not is listed on the <a href="/policy/transparency">transparency page</a>.</div>
+${raw(home.numbers({ docs, programmable, status: (ctx.networkStatus || networkStatus).peek() }))}
+${raw(home.build())}
+${raw(home.quickStart({ sdkVersion: docs.sdkVersion }))}
 ${raw(showcase.features({
                 title: 'Everything an integration needs', lede: 'Each piece is a public API with a reference generated from what production runs.',
                 items: [
@@ -96,12 +96,15 @@ ${raw(showcase.features({
                 ],
             }))}
 ${programmable.length ? raw(showcase.features({
-                id: 'services', title: 'Services you can build on', lede: 'Each one runs in production today; its API reference is generated from the capabilities it declares.',
+                id: 'services', title: 'Services you can build on', lede: 'Each one runs in production today; its API reference is generated from the capabilities it declares, and the counts are the ones an app can be granted.',
                 // Text only: an inline icon per service would double the page's weight (the home page's budget).
-                items: programmable.map((m) => ({
-                    title: m.name, text: (m.site && m.site.tagline) || productTagline.get(m.id) || '',
-                    href: `/docs/api/${m.id}`,
-                })),
+                items: programmable.map((m) => {
+                    const caps = home.publicCaps(m).length;
+                    const events = (m.eventsProduced || []).length;
+                    const counts = [`${caps} ${caps === 1 ? 'capability' : 'capabilities'}`, events ? `${events} event ${events === 1 ? 'type' : 'types'}` : ''].filter(Boolean).join(' · ');
+                    const tagline = (m.site && m.site.tagline) || productTagline.get(m.id) || '';
+                    return { title: m.name, text: tagline ? `${/[.!?]$/.test(tagline) ? tagline : `${tagline}.`} ${counts}` : counts, href: `/docs/api/${m.id}` };
+                }),
             })) : ''}
 ${raw(showcase.steps({
                 title: 'From account to integration',
@@ -115,7 +118,7 @@ ${raw(showcase.steps({
                 ],
             }))}
 ${raw(showcase.limits({
-                title: 'What a project gets', lede: 'Pricing is the limits: these are the numbers OpenVibe.Events enforces for every project today.',
+                title: 'What a project gets', lede: 'Projects cost nothing today: no plan to buy and no card to add. What a project gets is its limits, and these are the numbers OpenVibe.Events enforces for every project.',
                 columns: ['Sandbox', 'Production'], rows: limitRows, source: eventsSource && eventsSource.public,
             }))}
 <section class="sc-sec" aria-labelledby="h-ref"><h2 id="h-ref">Reference</h2>
@@ -124,6 +127,7 @@ ${recent.length ? html`<section class="sc-sec" aria-labelledby="h-rel"><h2 id="h
 ${table(['App', 'Kind', 'Version', 'Status', 'Trust', 'Published'], recent.map((x) => [
                 html`<a href="/apps/${x.app_id}">${x.name}</a>`, x.kind, html`<a href="/releases/${x.id}">${x.version}</a>`, x.status, x.trust.tier, time(x.published_at),
             ]))}</section>` : ''}
+${raw(home.faq())}
 ${raw(showcase.cta({ title: 'Start building', text: 'Sign in with your OpenVibe account; your first project takes a minute. Coding with an agent? OpenVibe.Codes routes the task to Claude Code, Codex, OpenCode or your own model.', actions: [{ label: 'Create a project', href: '/projects', primary: true }, { label: 'Code with any agent', href: 'https://openvibe.codes' }] }))}`,
         });
     });

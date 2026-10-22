@@ -60,6 +60,7 @@ const INTERNAL = [`http://127.0.0.1:3000${PROBE}`, `http://2130706433${PROBE}`, 
             'server/domain/limits.js': 'the services\' /limits.json (configured internal URLs)',
             'server/domain/project-archive.js': 'no request: a shell snippet in the archive\'s README text',
             'server/http/docs.js': 'Network changelog, Tools catalog and Billing policy (configured)',
+            'server/http/home.js': 'Network\'s public /api/v1/status (configured OV_NETWORK internal URL) for the home page\'s services-up number; no token',
         };
         const root = path.join(__dirname, '..');
         const found = [];
