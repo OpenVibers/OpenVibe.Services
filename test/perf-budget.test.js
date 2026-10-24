@@ -12,7 +12,7 @@ const { spawn } = require('child_process');
 const { measure, check, format } = require('openvibe-shared/perf-budget');
 
 const BUDGETS = {
-    htmlRawKB: 45,   // 42.9 with the home's own sections (2026-10-22: the platform in numbers, nine text-only "what you can build" cards, three quick-start samples, six FAQs and their FAQPage JSON-LD); 33.7 with openvibe-contracts 0.209 (2026-10-20: Blog, Reviews, Wiki, Coupons, Deals, Trade, Space, Host and News opened capabilities to apps, so the text-only catalog of services you can build on lists them); 30.8 on 2026-10-08 (six ring icons plus that catalog)
+    htmlRawKB: 48,   // 46.0 with the twelve text-only building blocks (plan track K, 2026-10-24); 42.9 with the home's own sections (2026-10-22: the platform in numbers, nine text-only "what you can build" cards, three quick-start samples, six FAQs and their FAQPage JSON-LD); 33.7 with openvibe-contracts 0.209 (2026-10-20: Blog, Reviews, Wiki, Coupons, Deals, Trade, Space, Host and News opened capabilities to apps, so the text-only catalog of services you can build on lists them); 30.8 on 2026-10-08 (six ring icons plus that catalog)
     htmlBrotliKB: 11,   // 10.0 with those sections (2026-10-22); 7.4
     jsFiles: 5,   // 5 (theme-loader, web-runtime, navbar, footer, boost: openvibe-shared/shell adds web-runtime, 2026-10-04)
     jsRawKB: 256,   // 254.1 with openvibe-shared 4.9.0 (status text twins in every theme, 2026-10-23); 246.2 with openvibe-shared 4.2.x (Ask Actor in the navbar, 2026-10-15); 239.1 (212.2 before openvibe-shared/shell's web-runtime.js)
