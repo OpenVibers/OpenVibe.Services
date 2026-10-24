@@ -56,7 +56,7 @@ const { boot, check, done } = require('./helpers/boot');
 
     const t = await boot();
     try {
-        await check('the home page: hero code that runs, numbers, what you can build, quick start, FAQ and its JSON-LD', async () => {
+        await check('the home page: hero code that runs, numbers, the building blocks, what you can build, quick start, FAQ and its JSON-LD', async () => {
             let r = await t.get('/');
             assert.strictEqual(r.status, 200);
             assert.ok(!/ov\.registry\./.test(r.text), 'the hero code no longer calls a client property the SDK does not have');
@@ -68,6 +68,10 @@ const { boot, check, done } = require('./helpers/boot');
                 assert.ok(r.text.includes(`href="https://github.com/OpenVibers/OpenVibe.Examples/tree/main/examples/${name}"`), `links the ${name} example`);
             }
             assert.match(r.text, /id="quick-start"/);
+            // The building blocks by their plain names, each linked; people who only want to use OpenVibe go to Vibe.
+            assert.match(r.text, /id="blocks"/);
+            for (const b of home.BLOCKS) assert.ok(r.text.includes(b.title.replace(/'/g, '&#39;')) && r.text.includes(`href="${b.href}"`), `the ${b.title} block`);
+            assert.ok(r.text.includes('<a href="https://openvibe.chat/vibe">Chat with Vibe</a>'), 'people are sent to Vibe');
             assert.match(r.text, /\d+ capabilit(y|ies)( · \d+ event types?)?<\/small>/, 'each service says what an app can be granted');
             assert.ok(!/per_minute|\d bytes</.test(r.text), 'limits read in plain units');
             const blocks = [...r.text.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));

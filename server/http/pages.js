@@ -82,6 +82,7 @@ const services = await registry.services();`;
             }))}
 <div class="notice">Status: alpha. What works and what does not is listed on the <a href="/policy/transparency">transparency page</a>.</div>
 ${raw(home.numbers({ docs, programmable, status: (ctx.networkStatus || networkStatus).peek() }))}
+${raw(home.blocks())}
 ${raw(home.build())}
 ${raw(home.quickStart({ sdkVersion: docs.sdkVersion }))}
 ${raw(showcase.features({

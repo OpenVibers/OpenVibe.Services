@@ -71,6 +71,32 @@ const BUILD = [
     { title: 'Run jobs on a node', text: 'Send a job to one API; it runs on a node that offers its runtime, including your own computer, and streams its output.', href: 'https://openvibe.run/' },
 ];
 
+// The building blocks (plan track K, the owner 2026-10-24: consumer products for people, "while also having our services
+// website" for builders): every service an app can call, by the plain name the network's menus use since contracts
+// 0.213.0, with the domain that documents it. People who only want to use OpenVibe are sent to Vibe.
+const BLOCKS = [
+    { title: 'AI API', text: 'Many models behind one OpenAI-compatible API: chat, summaries, extraction, embeddings, images. Every run says which model answered and what it cost.', href: 'https://ai.openvibe.services/' },
+    { title: 'Agents', text: 'Hand a task in plain words to the best agent for it (OpenVibe\'s own or another platform\'s), checked by a second model, with its cost and why. Runs now or on a schedule.', href: 'https://openvibe.actor/docs' },
+    { title: 'Compute', text: 'Send a job to one API; it runs on a node that offers its runtime, your own computer included, metered per second.', href: 'https://openvibe.run/' },
+    { title: 'Storage', text: 'Private S3-compatible zones per project and environment, for the AWS SDKs, rclone and backup tools.', href: 'https://openvibe.zone/' },
+    { title: 'Media API', text: 'Upload, transcode and serve video, clips and files from your project\'s own space, with signed links.', href: 'https://openvibe.media/' },
+    { title: 'Events', text: 'Publish to your project\'s topic and follow it with durable cursors or signed webhooks.', href: 'https://openvibe.events/' },
+    { title: 'Search', text: 'Streams, recordings, posts, jobs, rentals and help answers across the network in one query.', href: '/docs/api/search' },
+    { title: 'Robots and devices', text: 'Pair a robot or a computer, drive it through one gate with roles, limits and an e-stop, and write drivers as plugins.', href: 'https://openvibe.bot/' },
+    { title: 'Sign-in and accounts', text: 'OAuth 2.0 with PKCE for your users, scoped capability grants for your apps, export and deletion handled for you.', href: '/docs' },
+    { title: 'Payments and items', text: 'Tips, memberships and checkout through one ledger; items people earn and wear across every site.', href: 'https://openvibe.vip/' },
+    { title: 'Game services', text: 'Achievements, leaderboards and cloud saves for any game.', href: 'https://play.openvibe.network/' },
+    { title: 'Code with any agent', text: 'The open coding-agent harness: Claude Code, Codex, OpenCode, DeepSeek and self-hosted models behind one router.', href: 'https://openvibe.codes/' },
+];
+
+function blocks() {
+    return showcase.features({
+        id: 'blocks', title: 'The building blocks',
+        lede: 'Every OpenVibe product runs on these, and your app can call the same ones with a project\'s token.',
+        items: BLOCKS,
+    }).replace(/<\/section>$/, () => '<p class="sc-note">Just want to use OpenVibe? <a href="https://openvibe.chat/vibe">Chat with Vibe</a>, OpenVibe\'s assistant, or <a href="https://openvibe.network/">see everything people do here</a>.</p></section>');
+}
+
 function build() {
     return showcase.features({
         id: 'build', title: 'What you can build today',
@@ -143,4 +169,4 @@ function limitAmount(v, unit) {
     }
 }
 
-module.exports = { createNetworkStatus, numbers, build, quickStart, faq, FAQ, BUILD, limitAmount, publicCaps };
+module.exports = { createNetworkStatus, numbers, blocks, build, quickStart, faq, FAQ, BLOCKS, BUILD, limitAmount, publicCaps };
