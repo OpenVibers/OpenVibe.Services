@@ -57,6 +57,7 @@ const PAGE_TEXT = {
     '/docs/sdk': ['SDK reference', 'openvibe-sdk modules, from their type definitions.'],
     '/oauth': ['OAuth callback helper', 'Authorization code + PKCE, with a callback that never exchanges the code.'],
     '/tools/webhooks': ['Webhook signature tester', 'Decides as a receiver requiring signature v2 does.'],
+    '/mod': ['Mod the network', 'Every way to extend OpenVibe today (sites, bots, room hooks, watches, agents, drivers, worlds, events) and where packaged mods stand.'],
     '/manifests/validate': ['Manifest validation', 'App and mod manifests, validated against the pinned contracts.'],
     '/policy': ['Policy', 'The portal\'s policy pages: decisions, compatibility, licensing, transparency and community.'],
     '/policy/rfc': ['Proposals and decisions', 'How a contract, capability or event changes, and the ADR record.'],
@@ -112,6 +113,7 @@ function publicPages({ docs }) {
         { path: '/docs/sdk', changefreq: 'weekly', priority: 0.7 },
         { path: '/oauth', changefreq: 'monthly', priority: 0.5 },
         { path: '/tools/webhooks', changefreq: 'monthly', priority: 0.5 },
+        { path: '/mod', changefreq: 'weekly', priority: 0.8 },
         { path: '/manifests/validate', changefreq: 'monthly', priority: 0.5 },
         { path: '/policy', changefreq: 'monthly', priority: 0.5 },
         { path: '/policy/rfc', changefreq: 'monthly', priority: 0.4 },
@@ -228,6 +230,9 @@ function createDiscoveryRoutes(ctx) {
                     { title: 'Tools', url: abs('/docs/tools') },
                     { title: 'Coding harnesses', url: 'https://openvibe.codes/harnesses', note: 'the coding agents OpenVibe.Codes routes a task to (another site)' },
                     { title: 'SDK', url: abs('/docs/sdk') },
+                ] },
+                { title: 'Extend OpenVibe', links: [
+                    { title: 'Mod the network', url: abs('/mod'), note: 'every way to extend OpenVibe today, and where packaged mods stand' },
                 ] },
                 { title: 'Developer tools', links: [
                     { title: 'OAuth callback helper', url: abs('/oauth'), note: 'authorization code + PKCE, with a callback that never exchanges the code' },

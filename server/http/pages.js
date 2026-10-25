@@ -137,6 +137,7 @@ ${raw(showcase.cta({ title: 'Start building', text: 'Sign in with your OpenVibe 
     const adr = (id) => docs.adrs.find((a) => a.id === id);
     // What shipped on OpenVibe.Services: the shared update log every OpenVibe site has.
     r.get('/updates', (req, res) => page(req, res, { index: true, cache: PUBLIC_CACHE, title: 'What shipped on OpenVibe.Services', body: raw(frame.updatesBody({ service: 'services', siteName: 'OpenVibe.Services' }) + `<script src="${ovServe.url('shipped.js')}" defer></script>`) }));
+    r.get('/mod', (req, res) => page(req, res, { index: true, cache: PUBLIC_CACHE, title: 'Mod the network', crumbs: [{ label: 'Mod the network' }], body: require('./mod').modPage() }));
     r.get('/policy', (req, res) => page(req, res, {
         index: true, cache: PUBLIC_CACHE, title: 'Policy', crumbs: [{ label: 'Policy' }],
         body: html`<h1>Policy</h1><ul class="cards">
