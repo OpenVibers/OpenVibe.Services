@@ -27,6 +27,7 @@ const NAV = [
     { label: 'Docs', href: '/docs' },
     { label: 'OAuth', href: '/oauth' },
     { label: 'Webhooks', href: '/tools/webhooks' },
+    { label: 'Mod', href: '/mod' },
     { label: 'Manifests', href: '/manifests/validate' },
     { label: 'Policy', href: '/policy' },
 ];

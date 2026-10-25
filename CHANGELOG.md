@@ -4,6 +4,7 @@ Notable changes to OpenVibe.Services. The service is unreleased; everything belo
 
 ## Unreleased
 
+- **Mod the network** (`/mod`, `server/http/mod.js`; the owner 2026-10-25: "openvibe.services as the place to mod the network or build your own sites with the SDK and APIs"). Every way to extend OpenVibe today, each with its link: your own site with the shared home-page kit, chat bots, alerts and work into a team room (Chat room hooks), watches that act, agents, Bot drivers and screen shares, game worlds, events, and changing OpenVibe itself on Codes. Packaged mods say plainly that staff install them until ADR-013's signing and review decisions are made. In the navigation, the sitemap, llms.txt and the home's quick start. `test/mod-page.test.js`.
 - Control operations (ADR-048, plan T13 step 10): `POST /api/v1/resources/control` behind `services.resource.control` (contracts v0.154.0, was v0.150.0).
   - It takes a `common.resource-control-request@1` and answers the owning authority's `common.resource-control-result@1`. The request is forwarded through `openvibe-sdk/resources` `createResourceClient`.
   - Callers: a first-party service token, or a person who owns or administers the project.

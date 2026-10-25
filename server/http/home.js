@@ -103,7 +103,7 @@ function build() {
         id: 'build', title: 'What you can build today',
         lede: 'Each card is a working example in OpenVibe.Examples (MIT, with a smoke test) or a service you can call now.',
         items: BUILD,
-    }).replace(/<\/section>$/, () => `<p class="sc-note">Start from one: <code>npx --package=https://codeload.github.com/OpenVibers/OpenVibe.Examples/tar.gz/refs/tags/v0.3.0 create-openvibe-app my-app --template web</code> (templates: web, server, bot, mod). <a href="${EXAMPLES}">All examples</a>.</p></section>`);
+    }).replace(/<\/section>$/, () => `<p class="sc-note">Start from one: <code>npx --package=https://codeload.github.com/OpenVibers/OpenVibe.Examples/tar.gz/refs/tags/v0.3.0 create-openvibe-app my-app --template web</code> (templates: web, server, bot, mod). <a href="${EXAMPLES}">All examples</a> · <a href="/mod">Every way to mod the network</a>.</p></section>`);
 }
 
 /** Quick start: code that runs against production with the pinned SDK (the first sample needs no key at all). */
