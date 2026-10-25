@@ -81,6 +81,7 @@ const BLOCKS = [
     { title: 'Storage', text: 'Private S3-compatible zones per project and environment, for the AWS SDKs, rclone and backup tools.', href: 'https://openvibe.zone/' },
     { title: 'Media API', text: 'Upload, transcode and serve video, clips and files from your project\'s own space, with signed links.', href: 'https://openvibe.media/' },
     { title: 'Events', text: 'Publish to your project\'s topic and follow it with durable cursors or signed webhooks.', href: 'https://openvibe.events/' },
+    { title: 'Chat for your site', text: 'A support inbox or a chat room on any website with one tag: Vibe answers first, your team takes over. An open visitor API, the SDK, signed webhooks, and live feeds from Claude Code.', href: 'https://openvibe.chat/developers' },
     { title: 'Search', text: 'Streams, recordings, posts, jobs, rentals and help answers across the network in one query.', href: '/docs/api/search' },
     { title: 'Robots and devices', text: 'Pair a robot or a computer, drive it through one gate with roles, limits and an e-stop, and write drivers as plugins.', href: 'https://openvibe.bot/' },
     { title: 'Sign-in and accounts', text: 'OAuth 2.0 with PKCE for your users, scoped capability grants for your apps, export and deletion handled for you.', href: '/docs' },
