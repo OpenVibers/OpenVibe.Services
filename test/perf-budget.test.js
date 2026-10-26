@@ -12,8 +12,8 @@ const { spawn } = require('child_process');
 const { measure, check, format } = require('openvibe-shared/perf-budget');
 
 const BUDGETS = {
-    htmlRawKB: 48,   // 46.0 with the twelve text-only building blocks (plan track K, 2026-10-24); 42.9 with the home's own sections (2026-10-22: the platform in numbers, nine text-only "what you can build" cards, three quick-start samples, six FAQs and their FAQPage JSON-LD); 33.7 with openvibe-contracts 0.209 (2026-10-20: Blog, Reviews, Wiki, Coupons, Deals, Trade, Space, Host and News opened capabilities to apps, so the text-only catalog of services you can build on lists them); 30.8 on 2026-10-08 (six ring icons plus that catalog)
-    htmlBrotliKB: 11,   // 10.0 with those sections (2026-10-22); 7.4
+    htmlRawKB: 55,   // 50.7 with the Part of OpenVibe section (Shared 4.13, 2026-10-26); 46.0 with the twelve text-only building blocks (plan track K, 2026-10-24); 42.9 with the home's own sections (2026-10-22: the platform in numbers, nine text-only "what you can build" cards, three quick-start samples, six FAQs and their FAQPage JSON-LD); 33.7 with openvibe-contracts 0.209 (2026-10-20: Blog, Reviews, Wiki, Coupons, Deals, Trade, Space, Host and News opened capabilities to apps, so the text-only catalog of services you can build on lists them); 30.8 on 2026-10-08 (six ring icons plus that catalog)
+    htmlBrotliKB: 13,   // 11.5 with the Part of OpenVibe section (Shared 4.13, 2026-10-26); 10.0 with those sections (2026-10-22); 7.4
     jsFiles: 5,   // 5 (theme-loader, web-runtime, navbar, footer, boost: openvibe-shared/shell adds web-runtime, 2026-10-04)
     jsRawKB: 268,   // 263.4 with shared 4.11.0's seasonal navbar; 254.1 with openvibe-shared 4.9.0 (status text twins in every theme, 2026-10-23); 246.2 with openvibe-shared 4.2.x (Ask Actor in the navbar, 2026-10-15); 239.1 (212.2 before openvibe-shared/shell's web-runtime.js)
     jsBrotliKB: 67,   // 65.3 Shared 4.12.0: the light/dark switch, the seasonal mark and the theme pairs; 61.7 with shared 4.11.0's seasonal navbar; 59.1 with openvibe-shared 4.4.0 (every site in the launcher, 2026-10-17); 56.3 (49.9 before web-runtime.js)

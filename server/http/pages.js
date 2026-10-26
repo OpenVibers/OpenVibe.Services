@@ -129,6 +129,7 @@ ${table(['App', 'Kind', 'Version', 'Status', 'Trust', 'Published'], recent.map((
                 html`<a href="/apps/${x.app_id}">${x.name}</a>`, x.kind, html`<a href="/releases/${x.id}">${x.version}</a>`, x.status, x.trust.tier, time(x.published_at),
             ]))}</section>` : ''}
 ${raw(home.faq())}
+${raw(showcase.network({ service: 'services' }))}
 ${raw(showcase.cta({ title: 'Start building', text: 'Sign in with your OpenVibe account; your first project takes a minute. Coding with an agent? OpenVibe.Codes routes the task to Claude Code, Codex, OpenCode or your own model.', actions: [{ label: 'Create a project', href: '/projects', primary: true }, { label: 'Code with any agent', href: 'https://openvibe.codes' }] }))}`,
         });
     });
