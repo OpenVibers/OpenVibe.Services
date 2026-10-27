@@ -476,8 +476,10 @@ ${got.data.next_before ? html`<p><a href="/projects/${project.id}/audit?before=$
             const act = ([action, label]) => html`<form method="post" action="/projects/${controls.project.id}/resources/control" class="inline-form">${csrfField(c)}<input type="hidden" name="resource" value="${x.ovrn}"><input type="hidden" name="action" value="${action}"><button type="submit">${label}</button></form>`;
             return html`${offered.map((o, i) => html`${i ? ' ' : ''}${act(o)}`)}`;
         };
+        // A resource's own page at its service (common.resource-summary@1 links.console), https only: its name links there.
+        const consoleOf = (x) => { const u = x.links && x.links.console; return typeof u === 'string' && /^https:\/\/[A-Za-z0-9.-]+(\/|$)/.test(u) ? u : null; };
         const rows = result ? result.resources.map((x) => [
-            html`${x.name || x.id}<br><code class="small">${x.ovrn || x.id}</code>`,
+            html`${consoleOf(x) ? html`<a href="${consoleOf(x)}">${x.name || x.id}</a>` : (x.name || x.id)}<br><code class="small">${x.ovrn || x.id}</code>`,
             html`<a href="${link({ kind: x.kind, service: null })}"><code>${x.kind}</code></a>`,
             stateBadge(x.state),
             ...(ownerColumn ? [ownerCell(x.owner)] : []),
