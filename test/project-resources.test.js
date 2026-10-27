@@ -154,7 +154,7 @@ const { boot, check, done } = require('./helpers/boot');
             origin: 'http://bot.fake',
             async fetchAs(url) {
                 seen.push(new URL(url));
-                const body = { resources: [rob(R1, owner.subject), rob(R2, bob.subject), rob(R3, null), rob(R4, owner.subject, { project_id: projectId })], next_cursor: null };
+                const body = { resources: [rob(R1, owner.subject, { links: { console: `https://openvibe.bot/r/${R1}` } }), rob(R2, bob.subject, { links: { console: 'http://plain.example/x' } }), rob(R3, null), rob(R4, owner.subject, { project_id: projectId })], next_cursor: null };
                 return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
             },
             get: async () => ({ status: 404, body: {} }),
@@ -171,6 +171,7 @@ const { boot, check, done } = require('./helpers/boot');
             assert.strictEqual(r.status, 200, r.text.slice(0, 300));
             assert.match(r.text, /<h1>Your resources<\/h1>/);
             assert.ok(r.text.includes(R1) && !r.text.includes(R2) && !r.text.includes(R3) && !r.text.includes(R4), 'the person\'s own row only');
+            assert.ok(r.text.includes(`<a href="https://openvibe.bot/r/${R1}">Robot 01</a>`), 'its name links to its page at its service (links.console)');
             assert.ok(!r.text.includes('<th scope="col">Owner</th>'), 'no owner column: all of it is theirs');
             assert.strictEqual(seen.at(-1).searchParams.get('owner'), owner.subject, 'the signed-in person\'s subject, never a query value');
             const forged = await t.get(`/projects/mine?owner=${bob.subject}`, { as: owner });
@@ -178,6 +179,7 @@ const { boot, check, done } = require('./helpers/boot');
             assert.strictEqual(seen.at(-1).searchParams.get('owner'), owner.subject);
             const b = await t.get('/projects/mine', { as: bob });
             assert.ok(b.text.includes(R2) && !b.text.includes(R1), 'each person sees their own');
+            assert.ok(!b.text.includes('href="http://plain.example/x"'), 'https only');
             assert.strictEqual((await t.get('/projects/mine')).status, 401, 'signed out: sign in');
             const list = await t.get('/projects', { as: owner });
             assert.ok(list.text.includes('<a href="/projects/mine">Your resources</a>'), 'the projects page links it');
