@@ -71,7 +71,7 @@ function renderPage(o) {
     // This site's own account links live in the shared navbar's account menu (the page's account
     // bar below is only for visitors without JavaScript).
     if (signedIn) nav.menu = { before: [...(viewer.staff ? [{ label: 'Staff', href: '/staff', icon: 'fa-shield' }] : []), { label: 'Your projects', href: '/projects', icon: 'fa-folder' }] };
-    const footer = { service: 'services', variant: 'full', mount: '#ov-footer', brandName: SITE_NAME, updates: '/updates' };
+    const footer = { service: 'services', variant: 'auto', path: o.path, mount: '#ov-footer', brandName: SITE_NAME, updates: '/updates' };   // full on the front page only (Shared 4.19)
     const account = signedIn
         ? html`Signed in as <strong>${viewer.displayName || viewer.username || 'you'}</strong>${viewer.staff ? html` · <a href="/staff">Staff</a>` : ''} · <a href="/projects">Your projects</a> · <a href="/auth/logout?next=${loginNext}">Sign out</a>`
         : html`<a href="/auth/login?next=${loginNext}">Sign in with OpenVibe</a> to manage projects and apps`;
