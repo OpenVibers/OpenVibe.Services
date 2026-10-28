@@ -22,14 +22,16 @@ const { html, raw, esc } = require('./html');
 const NETWORK_URL = 'https://openvibe.network';
 const SITE_NAME = 'OpenVibe.Services';
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
+// The product's own places: the main ones carry an icon (phones get them as the bottom tab bar), the rest fold into
+// the navbar's More (Shared 4.22). Search is the navbar's magnifier and What shipped is the footer's.
 const NAV = [
-    { label: 'Projects', href: '/projects' },
-    { label: 'Docs', href: '/docs' },
-    { label: 'OAuth', href: '/oauth' },
-    { label: 'Webhooks', href: '/tools/webhooks' },
-    { label: 'Mod', href: '/mod' },
-    { label: 'Manifests', href: '/manifests/validate' },
-    { label: 'Policy', href: '/policy' },
+    { label: 'Projects', href: '/projects', icon: 'fa-diagram-project' },
+    { label: 'Docs', href: '/docs', icon: 'fa-book' },
+    { label: 'OAuth', href: '/oauth', icon: 'fa-key' },
+    { label: 'Webhooks', href: '/tools/webhooks', icon: 'fa-plug' },
+    { label: 'Mod', href: '/mod', icon: 'fa-shield-halved', more: true },
+    { label: 'Manifests', href: '/manifests/validate', icon: 'fa-file-lines', more: true },
+    { label: 'Policy', href: '/policy', icon: 'fa-shield-halved', more: true },
 ];
 
 const hashes = new Map();
@@ -60,7 +62,8 @@ function renderPage(o) {
     const nav = {
         service: 'services',
         apiBase: NETWORK_URL,
-        links: NAV.map((l) => ({ label: l.label, href: l.href, active: pathNow === l.href || pathNow.startsWith(`${l.href}/`) })),
+        links: NAV.map((l) => ({ label: l.label, href: l.href, ...(l.icon ? { icon: l.icon } : {}), ...(l.more ? { more: true } : {}), active: pathNow === l.href || pathNow.startsWith(`${l.href}/`) })),
+        appBar: true,   // phones: the places with icons as the bottom tab bar (Shared 4.20)
         history: { type: 'page', title: o.title || SITE_NAME },
         silentLogin: `${o.config.baseUrl}/auth/login?silent=1&next={url}`,
         sessionUrl: '/auth/me',
