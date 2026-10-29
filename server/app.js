@@ -54,6 +54,7 @@ const { createToolRoutes } = require('./http/tools');
 const { createPageRoutes } = require('./http/pages');
 const { createPortalRoutes, createReleaseActionRoutes } = require('./http/portal');
 const { createApi } = require('./http/api');
+const openapi = require('./http/openapi');
 const { createServicesReadiness, registerServicesGauges } = require('./observability');
 const { createActorLimits } = require('./http/actor-limits');
 const { createIndexNow } = require('openvibe-shared/indexnow');
@@ -177,6 +178,8 @@ async function createApp(opts = {}) {
     release.mount(app, { registry: metrics.registry });
     const readiness = createServicesReadiness({ store, network, outbox, docs, config, authorities, release: release.release, valkey: ctx.valkey });
     app.get('/api/ready', readiness.handler);
+    // GET /openapi.json: the public OpenAPI 3.1 document (server/http/openapi.js); /api/v1/openapi.json redirects here.
+    openapi.mount(app);
 
     // ── The merged resource index (ADR-048: services.resource.read) ──
     // Its own auth (a service token, or a person's token scoped to one project) and JSON-only answers; mounted
