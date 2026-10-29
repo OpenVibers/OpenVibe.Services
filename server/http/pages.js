@@ -33,16 +33,17 @@ const ROOT = path.join(__dirname, '..', '..');
 const readJson = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } };
 
 
-function createPageRoutes(ctx) {
-    const { config, docs, releases, trust, network, sso } = ctx;
-    const r = asyncRouter();
-    const form = express.urlencoded({ extended: false, limit: '32kb' });
+/**
+ * The public pages as data (title, body, cache, JSON-LD), shared by the routes below and the
+ * agent-layer twins (server/agent-pages.js) so a twin cannot drift from its page.
+ */
+function createPageViews(ctx) {
+    const { config, docs, releases } = ctx;
     const PUBLIC_CACHE = cache.htmlHeaders({ maxAge: 300 });
-    const page = (req, res, o, status = 200) => send(res, status, { viewer: req.viewer, config, path: req.originalUrl, ...o });
     // Services up across the network, from Network's public status (read in the background, never awaited here).
     const networkStatus = home.createNetworkStatus({ url: config.network.internalUrl, enabled: config.nodeEnv !== 'test' });
 
-    r.get('/', async (req, res) => {
+    async function homeView() {
         const recent = await releases.recentPublic(10);
         // The limits a developer's project really gets, from the service that enforces them (never restated here).
         const eventsSource = ctx.limits && ctx.limits.bySource ? ctx.limits.bySource('events') : null;
@@ -68,7 +69,7 @@ const services = await registry.services();`;
         const programmable = contracts.services.manifests
             .filter((m) => m && m.id !== 'services' && m.exposure && m.exposure.state === 'live' && apiDocs.has(m.id) && grantable(m))
             .sort((a, b) => ((a.site && a.site.position) ?? 50) - ((b.site && b.site.position) ?? 50) || a.name.localeCompare(b.name));
-        page(req, res, {
+        return {
             index: true, cache: PUBLIC_CACHE,
             jsonLd: [...homeJsonLd(config), seo.jsonLd.faq(home.FAQ)],
             styles: [showcase.STYLESHEET],
@@ -131,31 +132,34 @@ ${table(['App', 'Kind', 'Version', 'Status', 'Trust', 'Published'], recent.map((
 ${raw(home.faq())}
 ${raw(showcase.network({ service: 'services' }))}
 ${raw(showcase.cta({ title: 'Start building', text: 'Sign in with your OpenVibe account; your first project takes a minute. Coding with an agent? OpenVibe.Codes routes the task to Claude Code, Codex, OpenCode or your own model.', actions: [{ label: 'Create a project', href: '/projects', primary: true }, { label: 'Code with any agent', href: 'https://openvibe.codes' }] }))}`,
-        });
-    });
+        };
+    }
 
-    // ── Policy ──────────────────────────────────────────────
-    const adr = (id) => docs.adrs.find((a) => a.id === id);
-    // What shipped on OpenVibe.Services: the shared update log every OpenVibe site has.
-    r.get('/updates', (req, res) => page(req, res, { index: true, cache: PUBLIC_CACHE, title: 'What shipped on OpenVibe.Services', body: raw(frame.updatesBody({ service: 'services', siteName: 'OpenVibe.Services' }) + `<script src="${ovServe.url('shipped.js')}" defer></script>`) }));
-    r.get('/mod', (req, res) => page(req, res, { index: true, cache: PUBLIC_CACHE, title: 'Mod the network', crumbs: [{ label: 'Mod the network' }], body: require('./mod').modPage() }));
-    r.get('/policy', (req, res) => page(req, res, {
-        index: true, cache: PUBLIC_CACHE, title: 'Policy', crumbs: [{ label: 'Policy' }],
-        body: html`<h1>Policy</h1><ul class="cards">
+    function updates() {
+        return { index: true, cache: PUBLIC_CACHE, title: 'What shipped on OpenVibe.Services', body: raw(frame.updatesBody({ service: 'services', siteName: 'OpenVibe.Services' }) + `<script src="${ovServe.url('shipped.js')}" defer></script>`) };
+    }
+
+    function mod() {
+        return { index: true, cache: PUBLIC_CACHE, title: 'Mod the network', crumbs: [{ label: 'Mod the network' }], body: require('./mod').modPage() };
+    }
+
+    function policy() {
+        return {
+            index: true, cache: PUBLIC_CACHE, title: 'Policy', crumbs: [{ label: 'Policy' }],
+            body: html`<h1>Policy</h1><ul class="cards">
 <li><a href="/policy/rfc"><strong>Proposals and decisions</strong></a><span>how a contract, capability or event changes; the decision record</span></li>
 <li><a href="/policy/compatibility"><strong>Compatibility and deprecation</strong></a><span>ADR-002 and ADR-016, as published</span></li>
 <li><a href="/policy/licensing"><strong>Licensing</strong></a><span>what each package is licensed under</span></li>
 <li><a href="/policy/transparency"><strong>Transparency</strong></a><span>what Services stores, what it does not, and what works today</span></li></ul>
 <h2>Community</h2><p class="muted">These live on <a href="${CODES_ORIGIN}">OpenVibe.Codes</a>, where OpenVibe itself is built.</p><ul class="cards">
 ${COMMUNITY.map((g) => html`<li><a href="${CODES_ORIGIN}/policy/${g.slug}"><strong>${g.title}</strong></a><span>${g.blurb}</span></li>`)}</ul>`,
-    }));
+        };
+    }
 
-    // The community documents moved with Codes' contributor side: their old addresses here answer with Codes' page.
-    for (const g of COMMUNITY) r.get(`/policy/${g.slug}`, (req, res) => res.redirect(301, `${CODES_ORIGIN}/policy/${g.slug}`));
-
-    r.get('/policy/rfc', (req, res) => page(req, res, {
-        index: true, cache: PUBLIC_CACHE, title: 'Proposals and decisions', crumbs: [{ label: 'Policy', href: '/policy' }, { label: 'Proposals' }],
-        body: html`<h1>Proposals and decisions</h1>
+    function policyRfc() {
+        return {
+            index: true, cache: PUBLIC_CACHE, title: 'Proposals and decisions', crumbs: [{ label: 'Policy', href: '/policy' }, { label: 'Proposals' }],
+            body: html`<h1>Proposals and decisions</h1>
 <p>Changes to the platform's public surface — a contract, a capability, an event type, or a major product policy — are proposed in the open and recorded as an architecture decision record (ADR) in <a href="https://github.com/OpenVibers/OpenVibe.Contracts">OpenVibe.Contracts</a>.</p>
 <ol class="steps">
 <li><strong>Propose.</strong> Open an issue or pull request on OpenVibe.Contracts describing the change, who owns it, and who consumes it. A service that introduces capabilities ships proposals in its own repository (<code>docs/capabilities-proposal/</code>, <code>docs/service-manifest-proposal.json</code>) — this portal's are in <a href="https://github.com/OpenVibers/OpenVibe.Services/tree/main/docs">its repository</a>.</li>
@@ -165,12 +169,13 @@ ${COMMUNITY.map((g) => html`<li><a href="${CODES_ORIGIN}/policy/${g.slug}"><stro
 <h2>Decision record</h2>
 <p class="versions">The ADRs in <code>openvibe-contracts v${docs.contractsVersion}</code>:</p>
 ${table(['Decision', 'Status'], docs.adrs.map((a) => [html`<a href="/docs/adr/${a.id}">${a.title}</a>`, a.status]))}`,
-    }));
+        };
+    }
 
-    r.get('/policy/compatibility', (req, res) => {
-        const a2 = adr('ADR-002');
-        const a16 = adr('ADR-016');
-        page(req, res, {
+    function policyCompatibility() {
+        const a2 = docs.adrs.find((a) => a.id === 'ADR-002');
+        const a16 = docs.adrs.find((a) => a.id === 'ADR-016');
+        return {
             index: true, cache: PUBLIC_CACHE, title: 'Compatibility and deprecation', crumbs: [{ label: 'Policy', href: '/policy' }, { label: 'Compatibility' }],
             body: html`<h1>Compatibility and deprecation</h1>
 <p class="versions">This page renders two decisions exactly as published in <code>openvibe-contracts v${docs.contractsVersion}</code>, so it cannot say anything they do not.</p>
@@ -178,28 +183,28 @@ ${table(['Decision', 'Status'], docs.adrs.map((a) => [html`<a href="/docs/adr/${
 Deprecated capabilities: ${docs.capabilities.filter((c) => c.status === 'deprecated').map((c) => c.id).join(', ') || 'none'}.</p>
 ${a2 ? html`<article class="prose">${raw(markdown(a2.markdown))}</article>` : notice('ADR-002 is not in this contracts release.', 'warn')}
 ${a16 ? html`<article class="prose">${raw(markdown(a16.markdown))}</article>` : notice('ADR-016 is not in this contracts release.', 'warn')}`,
-        });
-    });
+        };
+    }
 
-    r.get('/policy/licensing', (req, res) => {
+    function policyLicensing() {
         const pkgs = ['openvibe-contracts', 'openvibe-sdk', 'openvibe-shared'].map((n) => {
             const p = readJson(path.join(path.dirname(require.resolve(`${n}/package.json`)), 'package.json')) || {};
             return [code(n), p.version || '—', p.license || 'not declared'];
         });
         const own = readJson(path.join(ROOT, 'package.json')) || {};
-        page(req, res, {
+        return {
             index: true, cache: PUBLIC_CACHE, title: 'Licensing', crumbs: [{ label: 'Policy', href: '/policy' }, { label: 'Licensing' }],
             body: html`<h1>Licensing</h1>
 <p>Read from the packages this portal runs, not typed in:</p>
 ${table(['Package', 'Version', 'License'], [[code(own.name || 'openvibe-services'), own.version || '—', own.license || 'not declared'], ...pkgs])}
 <p>The SDK is the library apps outside the network embed; the services and their contracts are open source under the licenses above. Each repository's LICENSE file is authoritative. This page is not legal advice.</p>
 <p>Source: <a href="https://github.com/OpenVibers">github.com/OpenVibers</a>.</p>`,
-        });
-    });
+        };
+    }
 
-    r.get('/policy/transparency', (req, res) => {
+    function policyTransparency() {
         const status = readJson(path.join(ROOT, 'STATUS.json')) || {};
-        page(req, res, {
+        return {
             index: true, cache: PUBLIC_CACHE, title: 'Transparency', crumbs: [{ label: 'Policy', href: '/policy' }, { label: 'Transparency' }],
             body: html`<h1>Transparency</h1>
 <h2>What Services stores</h2>
@@ -219,8 +224,37 @@ ${table(['Package', 'Version', 'License'], [[code(own.name || 'openvibe-services
 <p>Stage <strong>${status.stage || 'unknown'}</strong>. ${status.summary || ''}</p>
 ${Array.isArray(status.works) ? html`<h3>Works</h3><ul>${status.works.map((w) => html`<li>${w}</li>`)}</ul>` : ''}
 ${Array.isArray(status.notYet) ? html`<h3>Not yet</h3><ul>${status.notYet.map((w) => html`<li>${w}</li>`)}</ul>` : ''}`,
-        });
-    });
+        };
+    }
+
+    return { home: homeView, updates, mod, policy, policyRfc, policyCompatibility, policyLicensing, policyTransparency };
+}
+
+function createPageRoutes(ctx) {
+    const { config, docs, releases, trust, network, sso } = ctx;
+    const views = createPageViews(ctx);
+    const r = asyncRouter();
+    const form = express.urlencoded({ extended: false, limit: '32kb' });
+    const PUBLIC_CACHE = cache.htmlHeaders({ maxAge: 300 });
+    const page = (req, res, o, status = 200) => send(res, status, { viewer: req.viewer, config, path: req.originalUrl, ...o });
+    // Services up across the network, from Network's public status (read in the background, never awaited here).
+    const networkStatus = home.createNetworkStatus({ url: config.network.internalUrl, enabled: config.nodeEnv !== 'test' });
+
+    r.get('/', async (req, res) => page(req, res, await views.home()));
+
+    // ── Policy ──────────────────────────────────────────────
+    // What shipped on OpenVibe.Services: the shared update log every OpenVibe site has.
+    r.get('/updates', (req, res) => page(req, res, views.updates()));
+    r.get('/mod', (req, res) => page(req, res, views.mod()));
+    r.get('/policy', (req, res) => page(req, res, views.policy()));
+
+    // The community documents moved with Codes' contributor side: their old addresses here answer with Codes' page.
+    for (const g of COMMUNITY) r.get(`/policy/${g.slug}`, (req, res) => res.redirect(301, `${CODES_ORIGIN}/policy/${g.slug}`));
+
+    r.get('/policy/rfc', (req, res) => page(req, res, views.policyRfc()));
+    r.get('/policy/compatibility', (req, res) => page(req, res, views.policyCompatibility()));
+    r.get('/policy/licensing', (req, res) => page(req, res, views.policyLicensing()));
+    r.get('/policy/transparency', (req, res) => page(req, res, views.policyTransparency()));
 
     // ── Public release pages ────────────────────────────────
     const APP_ID_RE = /^app_[0-9A-HJKMNP-TV-Z]{26}$/;
@@ -319,4 +353,4 @@ ${signedIn ? releaseActions(req, rel) : ''}
 
 const statusBadge = (s) => badge(s, s === 'published' ? 'ok' : (s === 'revoked' ? 'bad' : (s === 'deprecated' ? 'warn' : '')));
 
-module.exports = { createPageRoutes, statusBadge };
+module.exports = { createPageRoutes, createPageViews, statusBadge };

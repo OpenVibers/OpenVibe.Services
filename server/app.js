@@ -207,6 +207,29 @@ async function createApp(opts = {}) {
     app.use('/auth', sso.routes());
     { const legal = require('openvibe-shared/legal'); app.get(legal.PATHS, legal.handler({ id: 'services', service: 'services', host: 'openvibe.services', name: 'OpenVibe.Services', profile: 'ugc' })); }
 
+    // The agent layer (openvibe-shared/agent-layer): /.well-known/agent.json, and the public pages as Markdown
+    // twins. It answers their HTML as well, with the discovery tags in the head, so it mounts before the routes
+    // for those pages and before the static files; private pages (/projects, /staff, /api) are never rendered here.
+    const agentLayer = express();
+    require('openvibe-shared/agent-layer').mount(agentLayer, {
+        descriptor: require('./agent-descriptor'),
+        render: require('./agent-pages').createAgentPages(ctx).renderPublicPage,
+    });
+    app.use((req, res, next) => {
+        const markdown = req.path.endsWith('.md') || req.query.format === 'markdown' || (req.headers.accept || '').includes('text/markdown');
+        // A signed-in visitor keeps the page their own route renders: their account bar, and a private cache.
+        if (!markdown && req.viewer && req.viewer.kind === 'user') return next();
+        if (markdown) return agentLayer(req, res, next);
+        // Telemetry labels a request by Express's route template; the pages this mount answers are a known,
+        // bounded set, so label them with their own path rather than 'unmatched'.
+        const route = req.route;
+        const owner = req.app;
+        req.route = { path: req.path };
+        // The child app sets req.app while it handles; restore it on pass-through so the parent's settings
+        // (trust proxy, for one) still apply to the routes below.
+        agentLayer(req, res, (err) => { req.route = route; req.app = owner; next(err); });
+    });
+
     // GET /<key>.txt — the IndexNow key file (mounted only when a key is configured; it serves itself).
     if (indexnow.enabled) app.use(indexnow.keyFile);
 
