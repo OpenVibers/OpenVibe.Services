@@ -27,9 +27,12 @@ const { send } = require('../render/layout');
 const { markdown } = require('../render/markdown');
 const { createLimitsReader, amount } = require('../domain/limits');
 
-function createDocsRoutes(ctx) {
-    const { docs, config, network } = ctx;
-    const r = asyncRouter();
+/**
+ * The public documentation pages as data (title, body, description), shared by the routes below and the
+ * agent-layer twins (server/agent-pages.js) so a twin cannot drift from its page.
+ */
+function createDocsViews(ctx) {
+    const { docs } = ctx;
     const openapi = require('openvibe-contracts').openapi;
     const apiIndex = openapi.index();
     const apiDocs = new Map(apiIndex.map((s) => [s.service, openapi.document(s.service)]));
@@ -39,11 +42,23 @@ function createDocsRoutes(ctx) {
     const versions = () => html`<p class="versions">Generated at ${time(docs.generatedAt)} from
 <a href="https://github.com/OpenVibers/OpenVibe.Contracts/tree/${docs.contractsTag}"><code>openvibe-contracts v${docs.contractsVersion}</code></a>${tagNote(docs.contractsTag, docs.contractsVersion)} and
 <a href="https://github.com/OpenVibers/OpenVibe.SDK/tree/${docs.sdkTag}"><code>openvibe-sdk v${docs.sdkVersion}</code></a>${tagNote(docs.sdkTag, docs.sdkVersion)}.</p>`;
-    const page = (req, res, o, status = 200) => send(res, status, { index: true, cache: PUBLIC_CACHE, viewer: req.viewer, config, path: req.originalUrl, ...o });
+    const METHOD_ORDER = ['get', 'head', 'post', 'put', 'patch', 'delete'];
+    const schemaLink = (s) => {
+        if (!s || typeof s !== 'object') return '—';
+        if (s.$ref) {
+            const key = String(s.$ref).replace('#/components/schemas/', '');
+            const id = key.replace(/\.v\d+$/, '');
+            return docs.contract(id) ? html`<a href="/docs/contracts/${id}">${id}@${key.split('.v').pop()}</a>` : code(key);
+        }
+        if (s.anyOf) return html`one of ${s.anyOf.map((x, i) => html`${i ? ', ' : ''}${schemaLink(x)}`)}`;
+        if (s.contentEncoding === 'binary') return 'bytes';
+        return code(s.type || 'schema');
+    };
+    const bodyOf = (content) => (content ? Object.entries(content).map(([type, m]) => html`<div><code>${type}</code> ${schemaLink(m.schema)}</div>`) : '—');
 
-    r.get('/', (req, res) => {
+    function index() {
         const grantable = docs.capabilities.filter((c) => c.grantable).length;
-        page(req, res, {
+        return {
             title: 'Docs',
             description: `OpenVibe platform reference generated from openvibe-contracts v${docs.contractsVersion} and openvibe-sdk v${docs.sdkVersion}.`,
             crumbs: [{ label: 'Docs' }],
@@ -68,8 +83,84 @@ function createDocsRoutes(ctx) {
 <pre tabindex="0"><code>npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/${docs.sdkTag}
 npm install https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/${docs.contractsTag}</code></pre>
 <p>The SDK is ${docs.sdkLicense}; the contracts are ${docs.contractsLicense}. The SDK release is tested against contracts <code>${docs.sdkContractsRange || 'n/a'}</code>.</p>`,
-        });
-    });
+        };
+    }
+
+    function apiExplorer() {
+        return {
+            title: 'API explorer',
+            description: `Every OpenVibe service route the contracts describe, with its capabilities and schemas: ${apiIndex.length} OpenAPI 3.1 documents.`,
+            crumbs: [{ label: 'Docs', href: '/docs' }, { label: 'API explorer' }],
+            body: html`<h1>API explorer</h1>${versions()}
+<p>One OpenAPI 3.1 document per service, generated from the capabilities in openvibe-contracts: every route a capability names, the capabilities it performs (a token for the service must carry one), its request and response schemas and its problem+json errors. A service may answer more routes than these; what is here is the contract.</p>
+${table(['Service', 'Routes', 'Capabilities', 'Origin', 'OpenAPI'], apiIndex.map((s) => [
+                html`<a href="/docs/api/${s.service}">${s.name}</a>`, String(s.operations), String(s.capabilities),
+                s.origin ? code(s.origin) : '—', html`<a href="/docs/api/${s.service}.json">${s.service}.json</a>`,
+            ]))}
+<p class="muted">Load a document into any OpenAPI tool from <code>https://openvibe.services/docs/api/&lt;service&gt;.json</code>, or read it from the package: <code>require('openvibe-contracts').openapi.document('tools')</code>.</p>`,
+        };
+    }
+
+    function apiService(service, { publicOnly = false } = {}) {
+        const doc = apiDocs.get(service);
+        if (!doc) return null;
+        const s = apiIndex.find((x) => x.service === service);
+        const ops = [];
+        for (const [p, methods] of Object.entries(doc.paths)) {
+            for (const m of Object.keys(methods).sort((a, b) => METHOD_ORDER.indexOf(a) - METHOD_ORDER.indexOf(b))) {
+                const op = methods[m];
+                if (publicOnly && !op['x-openvibe-visibility'].some((v) => v === 'public' || v === 'partner')) continue;
+                ops.push({ path: p, method: m, op });
+            }
+        }
+        const firstCap = new Set();
+        const opBlock = ({ path: p, method, op }) => {
+            const anchors = op['x-openvibe-capabilities'].filter((id) => !firstCap.has(id));
+            anchors.forEach((id) => firstCap.add(id));
+            const params = op.parameters || [];
+            return html`<section class="api-op" id="${op.operationId}">${anchors.map((id) => html`<span id="cap-${id}"></span>`)}
+<h3><span class="badge method-${method}">${method.toUpperCase()}</span> <code>${p}</code></h3>
+<p>${op.summary}</p>
+<dl class="facts"><dt>Capabilities</dt><dd>${op['x-openvibe-capabilities'].map((id, i) => html`${i ? ', ' : ''}<a href="/docs/capabilities/${id}">${id}</a>`)}${op.security.some((x) => !Object.keys(x).length) ? html` ${badge('open', 'ok')}` : ''}</dd>
+<dt>Visibility</dt><dd>${op['x-openvibe-visibility'].join(', ')}</dd>
+${params.length ? html`<dt>Parameters</dt><dd><ul class="plain">${params.map((x) => html`<li><code>${x.name}</code> (${x.in}${x.required ? ', required' : ''})${x.description ? html` — ${x.description}` : ''}</li>`)}</ul></dd>` : ''}
+${op.requestBody ? html`<dt>Request body</dt><dd>${bodyOf(op.requestBody.content)}</dd>` : ''}
+${op['x-openvibe-input'] && !op.requestBody ? html`<dt>Input</dt><dd>${schemaLink(op['x-openvibe-input'])}</dd>` : ''}
+<dt>Response</dt><dd>${bodyOf(op.responses['2XX'].content)}</dd>
+<dt>Errors</dt><dd><a href="/docs/contracts/errors.problem">errors.problem@1</a> (application/problem+json)</dd></dl>
+<details><summary>Description</summary>${markdown(op.description)}</details></section>`;
+        };
+        return {
+            title: `${s.name} API`,
+            description: `${s.operations} routes of ${s.name} with their capabilities and schemas (OpenAPI 3.1 from openvibe-contracts v${docs.contractsVersion}).`,
+            crumbs: [{ label: 'Docs', href: '/docs' }, { label: 'API explorer', href: '/docs/api' }, { label: s.name }],
+            body: html`<h1>${s.name} API</h1>${versions()}
+<p>${doc.servers ? html`Server <code>${doc.servers[0].url}</code>. ` : ''}${s.operations} routes performing ${s.capabilities} capabilities. <a href="/docs/api/${s.service}.json">OpenAPI 3.1 document</a>.</p>
+<form method="get" action="/docs/api/${s.service}" class="inline-form"><label><input type="checkbox" name="public" value="1"${publicOnly ? raw(' checked') : ''}> only routes apps can be granted (public, partner)</label> <button type="submit">Filter</button></form>
+${ops.length ? ops.map(opBlock) : html`<p class="muted">No route here matches.</p>`}
+${(doc['x-openvibe-other-bindings'] || []).length ? html`<h2>Other bindings</h2><ul class="plain">${doc['x-openvibe-other-bindings'].map((b) => html`<li><a href="/docs/capabilities/${b.capability}">${b.capability}</a>: <code>${b.binding}</code></li>`)}</ul>` : ''}`,
+        };
+    }
+
+    return { index, apiExplorer, apiService, cache: PUBLIC_CACHE };
+}
+
+function createDocsRoutes(ctx) {
+    const { docs, config, network } = ctx;
+    const r = asyncRouter();
+    const openapi = require('openvibe-contracts').openapi;
+    const apiIndex = openapi.index();
+    const apiDocs = new Map(apiIndex.map((s) => [s.service, openapi.document(s.service)]));
+    const PUBLIC_CACHE = cache.htmlHeaders({ maxAge: 300 });
+
+    const tagNote = (tag, version) => (tag !== `v${version}` ? html` (tag ${tag})` : '');
+    const versions = () => html`<p class="versions">Generated at ${time(docs.generatedAt)} from
+<a href="https://github.com/OpenVibers/OpenVibe.Contracts/tree/${docs.contractsTag}"><code>openvibe-contracts v${docs.contractsVersion}</code></a>${tagNote(docs.contractsTag, docs.contractsVersion)} and
+<a href="https://github.com/OpenVibers/OpenVibe.SDK/tree/${docs.sdkTag}"><code>openvibe-sdk v${docs.sdkVersion}</code></a>${tagNote(docs.sdkTag, docs.sdkVersion)}.</p>`;
+    const page = (req, res, o, status = 200) => send(res, status, { index: true, cache: PUBLIC_CACHE, viewer: req.viewer, config, path: req.originalUrl, ...o });
+    const views = createDocsViews(ctx);
+
+    r.get('/', (req, res) => page(req, res, views.index()));
 
     // ── Contracts ───────────────────────────────────────────
     r.get('/contracts', (req, res) => {
@@ -176,34 +267,7 @@ ${apiDocs.has(c.owner) ? html`<p><a href="/docs/api/${c.owner}#cap-${c.id}">Thes
     });
 
     // ── API explorer (WS-C task 6): openvibe-contracts' OpenAPI 3.1 per service ──
-    const METHOD_ORDER = ['get', 'head', 'post', 'put', 'patch', 'delete'];
-    const schemaLink = (s) => {
-        if (!s || typeof s !== 'object') return '—';
-        if (s.$ref) {
-            const key = String(s.$ref).replace('#/components/schemas/', '');
-            const id = key.replace(/\.v\d+$/, '');
-            return docs.contract(id) ? html`<a href="/docs/contracts/${id}">${id}@${key.split('.v').pop()}</a>` : code(key);
-        }
-        if (s.anyOf) return html`one of ${s.anyOf.map((x, i) => html`${i ? ', ' : ''}${schemaLink(x)}`)}`;
-        if (s.contentEncoding === 'binary') return 'bytes';
-        return code(s.type || 'schema');
-    };
-    const bodyOf = (content) => (content ? Object.entries(content).map(([type, m]) => html`<div><code>${type}</code> ${schemaLink(m.schema)}</div>`) : '—');
-
-    r.get('/api', (req, res) => {
-        page(req, res, {
-            title: 'API explorer',
-            description: `Every OpenVibe service route the contracts describe, with its capabilities and schemas: ${apiIndex.length} OpenAPI 3.1 documents.`,
-            crumbs: [{ label: 'Docs', href: '/docs' }, { label: 'API explorer' }],
-            body: html`<h1>API explorer</h1>${versions()}
-<p>One OpenAPI 3.1 document per service, generated from the capabilities in openvibe-contracts: every route a capability names, the capabilities it performs (a token for the service must carry one), its request and response schemas and its problem+json errors. A service may answer more routes than these; what is here is the contract.</p>
-${table(['Service', 'Routes', 'Capabilities', 'Origin', 'OpenAPI'], apiIndex.map((s) => [
-                html`<a href="/docs/api/${s.service}">${s.name}</a>`, String(s.operations), String(s.capabilities),
-                s.origin ? code(s.origin) : '—', html`<a href="/docs/api/${s.service}.json">${s.service}.json</a>`,
-            ]))}
-<p class="muted">Load a document into any OpenAPI tool from <code>https://openvibe.services/docs/api/&lt;service&gt;.json</code>, or read it from the package: <code>require('openvibe-contracts').openapi.document('tools')</code>.</p>`,
-        });
-    });
+    r.get('/api', (req, res) => page(req, res, views.apiExplorer()));
 
     r.get('/api/:service.json', (req, res, next) => {
         const doc = apiDocs.get(req.params.service);
@@ -212,45 +276,9 @@ ${table(['Service', 'Routes', 'Capabilities', 'Origin', 'OpenAPI'], apiIndex.map
     });
 
     r.get('/api/:service', (req, res, next) => {
-        const doc = apiDocs.get(req.params.service);
-        if (!doc) return next();
-        const s = apiIndex.find((x) => x.service === req.params.service);
-        const onlyPublic = req.query.public === '1';
-        const ops = [];
-        for (const [p, methods] of Object.entries(doc.paths)) {
-            for (const m of Object.keys(methods).sort((a, b) => METHOD_ORDER.indexOf(a) - METHOD_ORDER.indexOf(b))) {
-                const op = methods[m];
-                if (onlyPublic && !op['x-openvibe-visibility'].some((v) => v === 'public' || v === 'partner')) continue;
-                ops.push({ path: p, method: m, op });
-            }
-        }
-        const firstCap = new Set();
-        const opBlock = ({ path: p, method, op }) => {
-            const anchors = op['x-openvibe-capabilities'].filter((id) => !firstCap.has(id));
-            anchors.forEach((id) => firstCap.add(id));
-            const params = op.parameters || [];
-            return html`<section class="api-op" id="${op.operationId}">${anchors.map((id) => html`<span id="cap-${id}"></span>`)}
-<h3><span class="badge method-${method}">${method.toUpperCase()}</span> <code>${p}</code></h3>
-<p>${op.summary}</p>
-<dl class="facts"><dt>Capabilities</dt><dd>${op['x-openvibe-capabilities'].map((id, i) => html`${i ? ', ' : ''}<a href="/docs/capabilities/${id}">${id}</a>`)}${op.security.some((x) => !Object.keys(x).length) ? html` ${badge('open', 'ok')}` : ''}</dd>
-<dt>Visibility</dt><dd>${op['x-openvibe-visibility'].join(', ')}</dd>
-${params.length ? html`<dt>Parameters</dt><dd><ul class="plain">${params.map((x) => html`<li><code>${x.name}</code> (${x.in}${x.required ? ', required' : ''})${x.description ? html` — ${x.description}` : ''}</li>`)}</ul></dd>` : ''}
-${op.requestBody ? html`<dt>Request body</dt><dd>${bodyOf(op.requestBody.content)}</dd>` : ''}
-${op['x-openvibe-input'] && !op.requestBody ? html`<dt>Input</dt><dd>${schemaLink(op['x-openvibe-input'])}</dd>` : ''}
-<dt>Response</dt><dd>${bodyOf(op.responses['2XX'].content)}</dd>
-<dt>Errors</dt><dd><a href="/docs/contracts/errors.problem">errors.problem@1</a> (application/problem+json)</dd></dl>
-<details><summary>Description</summary>${markdown(op.description)}</details></section>`;
-        };
-        page(req, res, {
-            title: `${s.name} API`,
-            description: `${s.operations} routes of ${s.name} with their capabilities and schemas (OpenAPI 3.1 from openvibe-contracts v${docs.contractsVersion}).`,
-            crumbs: [{ label: 'Docs', href: '/docs' }, { label: 'API explorer', href: '/docs/api' }, { label: s.name }],
-            body: html`<h1>${s.name} API</h1>${versions()}
-<p>${doc.servers ? html`Server <code>${doc.servers[0].url}</code>. ` : ''}${s.operations} routes performing ${s.capabilities} capabilities. <a href="/docs/api/${s.service}.json">OpenAPI 3.1 document</a>.</p>
-<form method="get" action="/docs/api/${s.service}" class="inline-form"><label><input type="checkbox" name="public" value="1"${onlyPublic ? raw(' checked') : ''}> only routes apps can be granted (public, partner)</label> <button type="submit">Filter</button></form>
-${ops.length ? ops.map(opBlock) : html`<p class="muted">No route here matches.</p>`}
-${(doc['x-openvibe-other-bindings'] || []).length ? html`<h2>Other bindings</h2><ul class="plain">${doc['x-openvibe-other-bindings'].map((b) => html`<li><a href="/docs/capabilities/${b.capability}">${b.capability}</a>: <code>${b.binding}</code></li>`)}</ul>` : ''}`,
-        });
+        const o = views.apiService(req.params.service, { publicOnly: req.query.public === '1' });
+        if (!o) return next();
+        page(req, res, o);
     });
 
     // ── The update system (roadmap WS-A task 4) ─────────────
@@ -534,4 +562,4 @@ ${m.declarations.map((d, i) => html`<section id="d${i}" class="decl"><h2><small>
     return r;
 }
 
-module.exports = { createDocsRoutes };
+module.exports = { createDocsRoutes, createDocsViews };

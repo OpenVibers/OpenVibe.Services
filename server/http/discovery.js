@@ -196,7 +196,8 @@ function createDiscoveryRoutes(ctx) {
         // the sitemap. Every previous Disallow is kept (DISALLOW).
         res.type('text/plain').set('Cache-Control', cache.htmlHeaders({ maxAge: 3600 })).send(
             '# openvibe.services: the public pages are for search and AI crawlers; the portal, sign-in, staff and the API are not.\n'
-            + seo.robotsTxt({ sitemaps: [abs('/sitemap.xml')], disallow: DISALLOW }));
+            + seo.robotsTxt({ sitemaps: [abs('/sitemap.xml')], disallow: DISALLOW })
+            + `# Agent manifest: ${abs('/.well-known/agent.json')}\n`);
     });
 
     r.get('/llms.txt', (_req, res) => {
