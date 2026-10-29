@@ -77,19 +77,16 @@ meter.headroom { width: 8rem; max-width: 100%; vertical-align: middle; }
 
 /* The home page's showcase sections (openvibe-shared/showcase.css) sit inside .page, which has its own gutter. */
 .page .sc-hero, .page .sc-sec, .page .sc-cta { padding-left: 0; padding-right: 0; }
-.page .sc-ic .ov-icon { --ovi-size: 28px !important; }
 .services-hero-code { margin: 0; padding: 16px; border-radius: 14px; border: 1px solid var(--border, #1f2d47); background: var(--bg-primary, #0a0f1c); font-size: 13px; line-height: 1.6; overflow: auto; }
 
-/* The home page: the platform in numbers, quick-start samples one under another (their lines are long), and the FAQ. */
-.page .svc-num { margin-top: 28px; }
-.svc-num ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); }
-.svc-num a { display: flex; flex-direction: column; gap: 2px; height: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border, #1f2d47); background: var(--bg-secondary, #101828); color: inherit; text-decoration: none; }
-.svc-num a:hover, .svc-num a:focus-visible { border-color: var(--accent, #3b82f6); }
-.svc-num b { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; }
-.svc-num span { font-size: 13px; line-height: 1.35; color: var(--text-secondary, #96a7c2); }
-#quick-start .sc-code { grid-template-columns: minmax(0, 1fr); }
-#build .sc-note code { overflow-wrap: anywhere; }
-.svc-faq { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
-.svc-faq > div { padding: 16px 18px; border-radius: 16px; border: 1px solid var(--border, #1f2d47); background: var(--bg-secondary, #101828); }
-.svc-faq h3 { margin: 0 0 6px; font-size: 15.5px; line-height: 1.35; }
-.svc-faq p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text-secondary, #96a7c2); }
+/* The home page: the numbers strip sits close under the hero; the quick start's examples list and its folds
+   (openvibe-shared kit.css) keep the kit's own spacing; the shipped list follows the last section at a section's gap. */
+.page .svc-num { margin-top: 24px; }
+.page .svc-num .ovk-stats { margin-top: 0; margin-bottom: 0; }
+#quick-start .ovk-list-head { margin-top: 14px; }
+#quick-start .ovk-fold pre { margin: 6px 0 12px; }
+#quick-start .ovk-fold .sc-note { margin: 0; }
+#how .ovk-fold { margin-top: 18px; }
+#reference .ovk-fold { margin-top: 12px; }
+.page > .ov-shipped-home { margin-top: 40px; }
+#how .ovk-fold .sc-lede { font-size: .95rem; }

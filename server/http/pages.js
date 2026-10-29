@@ -15,13 +15,14 @@ const contracts = require('openvibe-contracts');
 const ovServe = require('openvibe-shared/serve');
 const frame = require('openvibe-shared/frame');
 const showcase = require('openvibe-shared/showcase');
+const kit = require('openvibe-shared/kit');
 const seo = require('openvibe-shared/seo');
 const cache = require('openvibe-shared/cache-policy');
 const path = require('path');
 const express = require('express');
 const { asyncRouter } = require('./router');
 const { createDiscoveryRoutes, homeJsonLd, COMMUNITY, CODES_ORIGIN } = require('./discovery');
-const { html, raw, table, code, badge, time, notice, csrfField, problemBox } = require('../render/html');
+const { html, raw, render, table, code, badge, time, notice, csrfField, problemBox } = require('../render/html');
 const { send } = require('../render/layout');
 const { markdown } = require('../render/markdown');
 const { csrfToken, checkCsrf, sameOrigin } = require('../auth/forms');
@@ -49,89 +50,63 @@ function createPageViews(ctx) {
         const eventsSource = ctx.limits && ctx.limits.bySource ? ctx.limits.bySource('events') : null;
         const eventsLimits = eventsSource ? await ctx.limits.read(eventsSource) : null;
         const limitRows = eventsLimits && eventsLimits.body ? eventsLimits.body.limits.slice(0, 6).map((l) => ({ label: l.label, values: [home.limitAmount(l.sandbox, l.unit), home.limitAmount(l.production, l.unit)] })) : [];
-        // The hero's code runs as written against production with the pinned SDK: public reads need no key
-        // (test/home.test.js runs it against a mock).
-        const snippet = `// openvibe-sdk v${docs.sdkVersion}
-const sdk = require('openvibe-sdk');
-const ov = sdk.createClient();      // public reads need no key
-
-const search = sdk.search.createSearchClient(ov);
-const { results } = await search.query('go live');
-
-const registry = sdk.registry.createRegistryClient(ov);
-const services = await registry.services();`;
         // The services a project can call: every live service with a generated API reference and at least one
-        // capability an app can be granted (Services itself aside), with its tagline from its site block or its
-        // product manifest. Read from the pinned contracts, never typed here.
-        const apiDocs = new Set(contracts.openapi.index().map((x) => x.service));
-        const productTagline = new Map(contracts.products.catalog().filter((p) => p.relationships && p.relationships.service && p.tagline).map((p) => [p.relationships.service, p.tagline]));
+        // capability an app can be granted (Services itself aside). Read from the pinned contracts, never typed here;
+        // the home counts them, and /docs/api lists every reference with its routes and capabilities.
+        const apiIndex = contracts.openapi.index();
+        const apiDocs = new Set(apiIndex.map((x) => x.service));
         const grantable = (m) => (m.capabilities || []).some((c) => { const cap = contracts.capabilities.get(c); return cap && cap.status === 'active' && cap.visibility === 'public'; });
         const programmable = contracts.services.manifests
-            .filter((m) => m && m.id !== 'services' && m.exposure && m.exposure.state === 'live' && apiDocs.has(m.id) && grantable(m))
-            .sort((a, b) => ((a.site && a.site.position) ?? 50) - ((b.site && b.site.position) ?? 50) || a.name.localeCompare(b.name));
+            .filter((m) => m && m.id !== 'services' && m.exposure && m.exposure.state === 'live' && apiDocs.has(m.id) && grantable(m));
+        // A front page is a taste and a door (the owner 2026-10-28: "act more like an app, not a huge long web page"):
+        // the hero with two actions and code that runs, the numbers as one strip, the building blocks as a launcher,
+        // the examples and the path, and what is read once (more code, the limits, releases) folded.
+        const limitsFold = limitRows.length ? kit.fold({
+            id: 'limits', title: 'What a project gets', meta: 'free today',
+            body: showcase.limits({
+                lede: 'No plan to buy and no card to add. What a project gets is its limits, and these are the numbers OpenVibe.Events enforces for every project.',
+                columns: ['Sandbox', 'Production'], rows: limitRows, source: eventsSource && eventsSource.public,
+            }).replace(/^<section class="sc-sec">/, '').replace(/<\/section>$/, ''),
+        }) : '';
+        const releasesFold = recent.length ? kit.fold({
+            id: 'releases', title: 'Recent releases', meta: `${recent.length} newest`,
+            body: render(table(['App', 'Kind', 'Version', 'Status', 'Trust', 'Published'], recent.map((x) => [
+                html`<a href="/apps/${x.app_id}">${x.name}</a>`, x.kind, html`<a href="/releases/${x.id}">${x.version}</a>`, x.status, x.trust.tier, time(x.published_at),
+            ]))),
+        }) : '';
         return {
             index: true, cache: PUBLIC_CACHE,
             jsonLd: [...homeJsonLd(config), seo.jsonLd.faq(home.FAQ)],
-            styles: [showcase.STYLESHEET],
+            // kit.css draws the numbers strip, the folds and the examples list; nothing on the page needs kit-web.js.
+            styles: [showcase.STYLESHEET, 'kit.css'],
             body: html`${raw(showcase.hero({
                 eyebrow: 'OpenVibe.Services · the developer platform · alpha',
                 title: 'Build with the whole', accent: 'network',
-                lede: 'One console for everything programmable on OpenVibe: projects, scoped credentials, capability grants, usage and releases, over every service. The reference is generated from the exact contract and SDK versions production runs.',
+                lede: 'One console for projects, apps and keys on every OpenVibe service.',
                 actions: [{ label: 'Create a project', href: '/projects', primary: true }, { label: 'Read the docs', href: '/docs' }],
-                note: 'Open source. Network owns projects, apps, credentials, grants and quotas; this console shows its API with your own sign-in and never stores a secret.',
-                aside: { html: `<pre tabindex="0" class="services-hero-code"><code>${showcase.esc(snippet)}</code></pre>` },
+                note: 'Alpha, open source and free. It never stores a secret.',
+                aside: { html: `<pre tabindex="0" class="services-hero-code"><code>${showcase.esc(home.heroCode({ sdkVersion: docs.sdkVersion }))}</code></pre>` },
             }))}
-<div class="notice">Status: alpha. What works and what does not is listed on the <a href="/policy/transparency">transparency page</a>.</div>
 ${raw(home.numbers({ docs, programmable, status: (ctx.networkStatus || networkStatus).peek() }))}
-${raw(home.blocks())}
-${raw(home.build())}
+${raw(home.blocks({ apis: apiIndex.length }))}
 ${raw(home.quickStart({ sdkVersion: docs.sdkVersion }))}
-${raw(showcase.features({
-                title: 'Everything an integration needs', lede: 'Each piece is a public API with a reference generated from what production runs.',
-                items: [
-                    { icon: 'ov:account', title: 'Scoped credentials', text: 'A confidential app gets a client secret, shown once; try calls in a playground with exactly the app\'s grants.', href: '/projects' },
-                    { icon: 'ov:check', title: 'Capability grants', text: 'Ask for exactly what your app does; grants are approved inside the project\'s allowance.', href: '/docs/capabilities?grantable=1' },
-                    { icon: 'ov:bell', title: 'Events and webhooks', text: 'Subscribe to the network and verify every delivery\'s signature.', href: '/tools/webhooks' },
-                    { icon: 'ov:docs', title: 'Reference and SDK', text: `APIs, contracts, capabilities and events from openvibe-contracts v${docs.contractsVersion}; openvibe-sdk v${docs.sdkVersion} for browser and server.`, href: '/docs' },
-                    { icon: 'ov:search', title: 'One resource index', text: 'Every resource of a project across every service, and on Your resources everything you own yourself (robots, rooms, streams, watches, Actor tasks, pastes), behind one API; each service keeps its own data.', href: '/docs/api/services' },
-                    { icon: 'ov:download', title: 'Take it with you', text: 'Export a project\'s configuration, objects and events as one archive, any time.', href: '/docs/export' },
-                ],
-            }))}
-${programmable.length ? raw(showcase.features({
-                id: 'services', title: 'Services you can build on', lede: 'Each one runs in production today; its API reference is generated from the capabilities it declares, and the counts are the ones an app can be granted.',
-                // Text only: an inline icon per service would double the page's weight (the home page's budget).
-                items: programmable.map((m) => {
-                    const caps = home.publicCaps(m).length;
-                    const events = (m.eventsProduced || []).length;
-                    const counts = [`${caps} ${caps === 1 ? 'capability' : 'capabilities'}`, events ? `${events} event ${events === 1 ? 'type' : 'types'}` : ''].filter(Boolean).join(' · ');
-                    const tagline = (m.site && m.site.tagline) || productTagline.get(m.id) || '';
-                    return { title: m.name, text: tagline ? `${/[.!?]$/.test(tagline) ? tagline : `${tagline}.`} ${counts}` : counts, href: `/docs/api/${m.id}` };
-                }),
-            })) : ''}
 ${raw(showcase.steps({
-                title: 'From account to integration',
+                id: 'how', title: 'From account to integration',
                 items: [
-                    { title: 'Create a project', text: 'Signed in with your OpenVibe account. New projects are sandbox-only; staff enable production.', href: '/projects' },
-                    { title: 'Add a sandbox app', text: 'A confidential app gets a client secret, shown once.' },
-                    { title: 'Pick capabilities', text: 'Request them for the app; they are approved only inside the project\'s allowance.', href: '/docs/capabilities?grantable=1' },
-                    { title: 'Get a token', text: 'createServiceTokenClient() for client credentials, or sign people in with authorization code + PKCE.', href: '/oauth' },
+                    { title: 'Create a project', text: 'Sandbox-only at first; staff switch on production.', href: '/projects' },
+                    { title: 'Add an app and its key', text: 'Its secret shows once; a playground has its grants.' },
+                    { title: 'Ask for capabilities', text: 'Approved inside the project\'s allowance.', href: '/docs/capabilities?grantable=1' },
+                    { title: 'Get a token', text: 'Client credentials, or sign people in with PKCE.', href: '/oauth' },
                     { title: 'Receive events', text: 'Subscribe, then verify each delivery\'s signature.', href: '/tools/webhooks' },
-                    { title: 'Publish a release', text: 'Validated release metadata; rotate or revoke credentials any time.', href: '/manifests/validate' },
+                    { title: 'Publish a release', text: 'Validated; rotate or revoke keys any time.', href: '/manifests/validate' },
                 ],
-            }))}
-${raw(showcase.limits({
-                title: 'What a project gets', lede: 'Projects cost nothing today: no plan to buy and no card to add. What a project gets is its limits, and these are the numbers OpenVibe.Events enforces for every project.',
-                columns: ['Sandbox', 'Production'], rows: limitRows, source: eventsSource && eventsSource.public,
-            }))}
-<section class="sc-sec" aria-labelledby="h-ref"><h2 id="h-ref">Reference</h2>
-<p class="sc-lede">Generated from <code>openvibe-contracts v${docs.contractsVersion}</code> and <code>openvibe-sdk v${docs.sdkVersion}</code>: <a href="/docs/api">API explorer</a> · <a href="/docs/contracts">contracts</a> · <a href="/docs/capabilities">capabilities</a> · <a href="/docs/events">events</a> · <a href="/docs/services">services</a> · <a href="/docs/tools">tools</a> · <a href="/docs/sdk">SDK</a> · <a href="/docs/limits">all limits</a>.</p></section>
-${recent.length ? html`<section class="sc-sec" aria-labelledby="h-rel"><h2 id="h-rel">Recent releases</h2>
-${table(['App', 'Kind', 'Version', 'Status', 'Trust', 'Published'], recent.map((x) => [
-                html`<a href="/apps/${x.app_id}">${x.name}</a>`, x.kind, html`<a href="/releases/${x.id}">${x.version}</a>`, x.status, x.trust.tier, time(x.published_at),
-            ]))}</section>` : ''}
+            }).replace(/<\/section>$/, () => `${limitsFold}</section>`))}
+<section class="sc-sec" id="reference" aria-labelledby="h-ref"><h2 id="h-ref">Reference</h2>
+<p class="sc-lede">Generated from <code>openvibe-contracts v${docs.contractsVersion}</code> and <code>openvibe-sdk v${docs.sdkVersion}</code>: <a href="/docs/api">API explorer</a> · <a href="/docs/contracts">contracts</a> · <a href="/docs/capabilities">capabilities</a> · <a href="/docs/events">events</a> · <a href="/docs/services">services</a> · <a href="/docs/tools">tools</a> · <a href="/docs/sdk">SDK</a> · <a href="/docs/limits">all limits</a>.</p>
+<p class="sc-note">One API lists <a href="/docs/api/services">every resource of a project</a> across every service; <a href="/docs/export">export a project</a> as one archive any time. Alpha: what works and what does not is on the <a href="/policy/transparency">transparency page</a>.</p>
+${raw(releasesFold)}</section>
 ${raw(home.faq())}
-${raw(showcase.network({ service: 'services' }))}
-${raw(showcase.cta({ title: 'Start building', text: 'Sign in with your OpenVibe account; your first project takes a minute. Coding with an agent? OpenVibe.Codes routes the task to Claude Code, Codex, OpenCode or your own model.', actions: [{ label: 'Create a project', href: '/projects', primary: true }, { label: 'Code with any agent', href: 'https://openvibe.codes' }] }))}`,
+${raw(showcase.network({ service: 'services' }))}`,
         };
     }
 
