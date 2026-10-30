@@ -78,7 +78,7 @@ const { boot, check, done } = require('./helpers/boot');
             // The building blocks as a launcher (showcase.apps), each linked; every service's API behind See all; people
             // who only want to use OpenVibe go to Vibe.
             const launcher = (/<section class="sc-sec sc-apps-sec" id="blocks"[\s\S]*?<\/section>/.exec(r.text) || [''])[0];
-            assert.ok(launcher.includes('<ul class="sc-apps">'), 'the building blocks are a launcher');
+            assert.match(launcher, /<ul class="sc-apps(?: sc-apps--c\d)?">/, 'the building blocks are a launcher');   // openvibe-shared 4.48.0 sets three columns for a count of 3n
             for (const b of home.BLOCKS) assert.ok(launcher.includes(`<a href="${b.href}">`) && launcher.includes(`<b>${b.name}</b>`), `the ${b.name} block`);
             const apis = require('openvibe-contracts').openapi.index().length;
             assert.ok(launcher.includes(`<p class="sc-apps-more"><a href="/docs/api">See all ${apis} service APIs →</a></p>`), 'See all opens every service\'s API reference');
