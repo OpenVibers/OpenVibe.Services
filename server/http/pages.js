@@ -23,6 +23,7 @@ const express = require('express');
 const { asyncRouter } = require('./router');
 const { createDiscoveryRoutes, homeJsonLd, COMMUNITY, CODES_ORIGIN } = require('./discovery');
 const { html, raw, render, table, code, badge, time, notice, csrfField, problemBox } = require('../render/html');
+const { pickBlock, pickRules, foldBlock } = require('../render/short');
 const { send } = require('../render/layout');
 const { markdown } = require('../render/markdown');
 const { csrfToken, checkCsrf, sameOrigin } = require('../auth/forms');
@@ -76,6 +77,8 @@ function createPageViews(ctx) {
         }) : '';
         return {
             index: true, cache: PUBLIC_CACHE,
+            // The shipped list is a fold on the home, so the layout must not add it a second time.
+            shipped: false,
             jsonLd: [...homeJsonLd(config), seo.jsonLd.faq(home.FAQ)],
             // kit.css draws the numbers strip, the folds and the examples list; nothing on the page needs kit-web.js.
             styles: [showcase.STYLESHEET, 'kit.css'],
@@ -90,23 +93,44 @@ function createPageViews(ctx) {
 ${raw(home.numbers({ docs, programmable, status: (ctx.networkStatus || networkStatus).peek() }))}
 ${raw(home.blocks({ apis: apiIndex.length }))}
 ${raw(home.quickStart({ sdkVersion: docs.sdkVersion }))}
-${raw(showcase.steps({
-                id: 'how', title: 'From account to integration',
-                items: [
-                    { title: 'Create a project', text: 'Sandbox-only at first; staff switch on production.', href: '/projects' },
-                    { title: 'Add an app and its key', text: 'Its secret shows once; a playground has its grants.' },
-                    { title: 'Ask for capabilities', text: 'Approved inside the project\'s allowance.', href: '/docs/capabilities?grantable=1' },
-                    { title: 'Get a token', text: 'Client credentials, or sign people in with PKCE.', href: '/oauth' },
-                    { title: 'Receive events', text: 'Subscribe, then verify each delivery\'s signature.', href: '/tools/webhooks' },
-                    { title: 'Publish a release', text: 'Validated; rotate or revoke keys any time.', href: '/manifests/validate' },
-                ],
-            }).replace(/<\/section>$/, () => `${limitsFold}</section>`))}
-<section class="sc-sec" id="reference" aria-labelledby="h-ref"><h2 id="h-ref">Reference</h2>
+${raw(foldBlock({
+                id: 'how',
+                head: '<h2 id="h-how">From account to integration</h2>',
+                html: showcase.steps({
+                    id: 'how', title: 'From account to integration',
+                    items: [
+                        { title: 'Create a project', text: 'Sandbox-only at first; staff switch on production.', href: '/projects' },
+                        { title: 'Add an app and its key', text: 'Its secret shows once; a playground has its grants.' },
+                        { title: 'Ask for capabilities', text: 'Approved inside the project\'s allowance.', href: '/docs/capabilities?grantable=1' },
+                        { title: 'Get a token', text: 'Client credentials, or sign people in with PKCE.', href: '/oauth' },
+                        { title: 'Receive events', text: 'Subscribe, then verify each delivery\'s signature.', href: '/tools/webhooks' },
+                        { title: 'Publish a release', text: 'Validated; rotate or revoke keys any time.', href: '/manifests/validate' },
+                    ],
+                }).replace(/<\/section>$/, () => `${limitsFold}</section>`),
+            }))}
+${raw(foldBlock({
+                id: 'reference',
+                head: '<h2 id="h-ref">Reference</h2>',
+                html: `<section class="sc-sec" id="reference" aria-labelledby="h-ref"><h2>Reference</h2>
 <p class="sc-lede">Generated from <code>openvibe-contracts v${docs.contractsVersion}</code> and <code>openvibe-sdk v${docs.sdkVersion}</code>: <a href="/docs/api">API explorer</a> · <a href="/docs/contracts">contracts</a> · <a href="/docs/capabilities">capabilities</a> · <a href="/docs/events">events</a> · <a href="/docs/services">services</a> · <a href="/docs/tools">tools</a> · <a href="/docs/sdk">SDK</a> · <a href="/docs/limits">all limits</a>.</p>
 <p class="sc-note">One API lists <a href="/docs/api/services">every resource of a project</a> across every service; <a href="/docs/export">export a project</a> as one archive any time. Alpha: what works and what does not is on the <a href="/policy/transparency">transparency page</a>.</p>
-${raw(releasesFold)}</section>
-${raw(home.faq())}
-${raw(showcase.network({ service: 'services' }))}`,
+${raw(releasesFold)}</section>`,
+            }))}
+${raw(foldBlock({
+                id: 'faq',
+                head: '<h2 id="h-faq">Questions developers ask</h2>',
+                html: home.faq(),
+            }))}
+${raw(foldBlock({
+                id: 'network',
+                head: '<h2 id="h-network">Part of OpenVibe</h2>',
+                html: showcase.network({ service: 'services' }),
+            }))}
+${raw(foldBlock({
+                id: 'shipped',
+                head: '<h2 id="h-shipped">Recently shipped on OpenVibe.Services</h2>',
+                html: frame.shipped({ service: 'services', title: 'Recently shipped on OpenVibe.Services' }),
+            }))}`,
         };
     }
 

@@ -90,3 +90,23 @@ meter.headroom { width: 8rem; max-width: 100%; vertical-align: middle; }
 #reference .ovk-fold { margin-top: 12px; }
 .page > .ov-shipped-home { margin-top: 40px; }
 #how .ovk-fold .sc-lede { font-size: .95rem; }
+
+/* The fold (the owner's short-pages rule, 2026-10-30): closed on a phone, and where there is room it looks like the
+   section it replaces: a heading and its content, with no card around it. The page's own markup keeps it open, so a
+   browser without the script shows it as before. */
+.svc-fold-block { margin: 28px 0; }
+.svc-fold-block > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 0 16px; cursor: pointer; color: var(--text-primary, #e6edf7); font-weight: 700; list-style: none; border: 1px solid var(--border, #1f2d47); border-radius: 14px; background: var(--bg-card, #131c2e); }
+.svc-fold-block > summary::-webkit-details-marker { display: none; }
+.svc-fold-block > summary h2 { margin: 0; padding: 0; border: 0; font-size: 1.05rem; }
+.svc-fold-block > summary span { color: var(--text-secondary, #96a7c2); font-weight: 600; font-size: .86rem; text-align: right; }
+.svc-fold-block > summary:focus-visible { outline: 2px solid var(--accent, #3b82f6); outline-offset: -2px; border-radius: 14px; }
+.svc-fold-block .sc-sec { margin: 0; }
+.svc-fold-block .sc-sec > h2 { display: none; }
+.svc-fold-block .ov-shipped-home { margin: 8px 16px 0; }
+@media (min-width: 641px) {
+  .svc-fold-block { border: 0; background: none; margin-top: 40px; }
+  .svc-fold-block > summary { display: block; min-height: 0; padding: 0; border: 0; background: none; }
+  .svc-fold-block > summary h2 { margin: 0 0 6px; font-size: 1.3rem; border-bottom: 1px solid var(--border, #1f2d47); padding-bottom: .2em; }
+  .svc-fold-block > summary span { display: none; }
+  .svc-fold-block .ov-shipped-home { margin-left: 0; margin-right: 0; }
+}
