@@ -8,12 +8,12 @@
   "port": 4930,
   "domain": "openvibe.services",
   "contracts": "openvibe-contracts v0.222.0",
-  "sdk": "openvibe-sdk v0.67.0",
-  "shared": "openvibe-shared v4.43.0",
+  "sdk": "openvibe-sdk v0.73.0",
+  "shared": "openvibe-shared v4.48.0",
   "packages": [
     "openvibe-contracts v0.222.0",
-    "openvibe-sdk v0.67.0",
-    "openvibe-shared v4.43.0"
+    "openvibe-sdk v0.73.0",
+    "openvibe-shared v4.48.0"
   ],
   "capabilities": [
     "services.resource.read",
@@ -64,5 +64,5 @@
     "Governance material (code of conduct, contribution guide, contributor ladder, moderation policy) is written as drafts pending owner review: not in effect, not indexed",
     "plan T13 step 4 done in OpenVibe.Contracts v0.110.0 (services.resource.read is registered, active and first-party), step 5 done in Network, step 7 (read model + ingestion), steps 9-15 (console, control operations, recipes, usage, deploy)"
   ],
-  "updated": "2026-10-29"
+  "updated": "2026-10-30"
 }
