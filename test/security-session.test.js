@@ -35,16 +35,20 @@ const { signJwt } = require('./helpers/mocks');
     await check('an app token is not a Services session', async () => {
         const token = signJwt({ iss: s.network.url, sub: `app:${APP}`, actor_type: 'app', aud: ['openvibe.network'], cap: ['x.y.z'], subject_id: staff.subject, iat: now(), exp: now() + 300 }, s.network.privatePem);
         const me = await s.get('/auth/me', { cookie: `services_at=${token}` });
-        assert.strictEqual(me.status, 401);
+        assert.strictEqual(me.status, 200);
+        assert.strictEqual(JSON.parse(me.text).user, null);
     });
 
-    await check('/auth/me: a guest is signed out (200 { user: null }); a session cookie that fails is 401', async () => {
+    await check('/auth/me: a guest and a session that fails are both 200 { user: null } (the SDK shape)', async () => {
         const guest = await s.get('/auth/me');
         assert.strictEqual(guest.status, 200, 'no session cookie at all: not an error');
         assert.deepStrictEqual(JSON.parse(guest.text), { user: null });
         assert.strictEqual(guest.headers.get('cache-control'), 'private, no-store');
-        assert.strictEqual((await s.get('/auth/me', { cookie: 'services_at=garbage' })).status, 401, 'a present but invalid access cookie');
-        assert.strictEqual((await s.get('/auth/me', { cookie: 'services_rt=stale' })).status, 401, 'a refresh cookie alone is a session that did not resolve');
+        for (const cookie of ['services_at=garbage', 'services_rt=stale']) {
+            const r = await s.get('/auth/me', { cookie });
+            assert.strictEqual(r.status, 200, `${cookie}: a signed-out answer, not an error`);
+            assert.strictEqual(JSON.parse(r.text).user, null, `${cookie} signs nobody in`);
+        }
         assert.strictEqual((await s.get('/auth/me', { as: staff })).status, 200);
     });
 

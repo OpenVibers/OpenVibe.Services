@@ -137,7 +137,8 @@ function jwk(k, kid) { return { ...k.export({ format: 'jwk' }), use: 'sig', alg:
         // Signed by the Network, but exp is an hour in the past: the SDK's Math.floor(now / 1000) must see it.
         const expired = t.network.userToken(u, { ttl: -3600 });
         const me = await t.get('/auth/me', { cookie: `services_at=${expired}` });
-        assert.strictEqual(me.status, 401, `an expired cookie is not a session: ${me.status} ${me.text.slice(0, 200)}`);
+        assert.strictEqual(me.status, 200, `an expired cookie is signed out: ${me.status} ${me.text.slice(0, 200)}`);
+        assert.strictEqual(me.json().user, null, 'an expired cookie is not a session');
         const page = await t.get('/', { cookie: `services_at=${expired}` });
         assert.ok(page.status < 400, `a page still renders: ${page.status}`);
         assert.ok(!page.text.includes('expired-demo'), 'the expired token signed nobody in');
