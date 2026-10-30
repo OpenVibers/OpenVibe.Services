@@ -176,7 +176,7 @@ async function createApp(opts = {}) {
     }), next));
     // GET /release.json (ADR-016) and POST /release-metrics: open tabs' update reports into /metrics.
     release.mount(app, { registry: metrics.registry });
-    const readiness = createServicesReadiness({ store, network, outbox, docs, config, authorities, release: release.release, valkey: ctx.valkey });
+    const readiness = createServicesReadiness({ store, network, outbox, docs, config, authorities, release: release.release, valkey: ctx.valkey, sso });
     app.get('/api/ready', readiness.handler);
     // GET /openapi.json: the public OpenAPI 3.1 document (server/http/openapi.js); /api/v1/openapi.json redirects here.
     openapi.mount(app);

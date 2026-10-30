@@ -23,18 +23,21 @@ async function main() {
             assert.strictEqual(r.json.events.pending, 0);                    // nothing has happened in this boot
         });
 
-        await check('readiness: GET /api/ready requires the database and the docs; the rest degrades, never fails', async () => {
+        await check('readiness: GET /api/ready requires the database, the docs and an accepted OAuth client', async () => {
             const r = await t.call('GET', '/api/ready', { token: null });
-            assert.strictEqual(r.status, 200, r.text);
-            assert.strictEqual(r.json.ready, true, r.text);
+            // This stub Network refuses the OAuth client (it has no /oauth/token grant for it): a wrong client must
+            // fail the deploy's readiness at once, never read green.
+            assert.strictEqual(r.status, 503, r.text);
+            assert.strictEqual(r.json.ready, false, r.text);
             assert.strictEqual(r.json.service, 'services');
-            for (const name of ['db', 'docs']) {
-                assert.strictEqual(r.json.checks[name].status, 'ok', name);
+            for (const name of ['db', 'docs', 'oauth_client']) {
                 assert.strictEqual(r.json.checks[name].required, true, name);
             }
+            for (const name of ['db', 'docs']) assert.strictEqual(r.json.checks[name].status, 'ok', name);
+            assert.strictEqual(r.json.checks.oauth_client.status, 'fail', 'the refused client is named');
+            assert.deepStrictEqual(r.json.failed, ['oauth_client']);
             assert.strictEqual(r.json.checks.network_jwks.status, 'ok');     // the stub Network's key is loaded
             assert.strictEqual(r.json.checks.network_jwks.required, false);  // docs and tools serve without it
-            assert.deepStrictEqual(r.json.failed, []);
             // The relay is off in this boot (no EVENTS_URL): reported as degraded, never as ready.
             assert.ok(r.json.degraded.includes('events_relay'), r.text);
             assert.deepStrictEqual(r.json.authorities, { count: 0, ids: [] });

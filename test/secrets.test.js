@@ -115,11 +115,14 @@ const { boot, check, done } = require('./helpers/boot');
     });
 
     await check('session cookies are httpOnly (no script can read the Network token)', async () => {
-        const code = t.network.issueCode(owner, 'x');
-        void code;
         const login = await t.get('/auth/login?next=/projects');
-        const flow = login.headers.get('set-cookie');
-        assert.match(flow, /services_oauth=.*HttpOnly/i);
+        const loc = new URL(login.headers.get('location'));
+        const flowCookie = login.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+        const code = t.network.issueCode(owner, loc.searchParams.get('code_challenge'));
+        const cb = await t.get(`/auth/callback?code=${code}&state=${loc.searchParams.get('state')}`, { cookie: flowCookie });
+        const set = cb.headers.getSetCookie().join('\n');
+        assert.match(set, /ov_token=[^;]+;.*HttpOnly/i);
+        assert.match(set, /ov_refresh=[^;]+;.*HttpOnly/i);
     });
 
     await t.close();

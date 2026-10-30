@@ -7,6 +7,9 @@ const assert = require('assert');
 const crypto = require('crypto');
 const { boot, check, done } = require('./helpers/boot');
 
+/** Every Set-Cookie of a response as a Cookie header (the SDK's flow spans several cookies). */
+const cookieHeader = (res) => res.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+
 (async () => {
     const t = await boot();
     const user = t.network.addUser('kim');
@@ -19,45 +22,58 @@ const { boot, check, done } = require('./helpers/boot');
         assert.strictEqual(loc.searchParams.get('client_id'), 'services');
         assert.strictEqual(loc.searchParams.get('code_challenge_method'), 'S256');
         assert.match(loc.searchParams.get('code_challenge'), /^[A-Za-z0-9_-]{43}$/);
-        assert.match(loc.searchParams.get('state'), /^[0-9a-f]{32}$/);
-        assert.match(r.headers.get('set-cookie'), /services_oauth=.*Path=\/auth.*HttpOnly/i);
+        assert.match(loc.searchParams.get('state'), /^[A-Za-z0-9_-]{32}$/);
+        const set = r.headers.getSetCookie().join('\n');
+        assert.match(set, /ov_oauth_state=[^;]+;.*Path=\/auth.*HttpOnly/i);
+        assert.match(set, /ov_oauth_verifier=[^;]+;.*Path=\/auth.*HttpOnly/i);
+        assert.match(set, /ov_oauth_next=%2Fprojects|ov_oauth_next=\/projects/);
     });
 
     await check('callback exchanges the code with the matching verifier and sets httpOnly session cookies', async () => {
         const login = await t.get('/auth/login?next=/projects');
         const loc = new URL(login.headers.get('location'));
-        const flowCookie = login.headers.get('set-cookie').split(';')[0];
+        const flowCookie = cookieHeader(login);
         const code = t.network.issueCode(user, loc.searchParams.get('code_challenge'));
         const r = await t.get(`/auth/callback?code=${code}&state=${loc.searchParams.get('state')}`, { cookie: flowCookie });
         assert.strictEqual(r.status, 302, r.text);
         assert.strictEqual(r.headers.get('location'), '/projects');
         const set = r.headers.get('set-cookie');
-        assert.match(set, /services_at=[^;]+;.*HttpOnly/i);
-        assert.match(set, /services_rt=[^;]+;.*HttpOnly/i);
-        const at = set.match(/services_at=([^;]+)/)[1];
-        const me = await t.get('/auth/me', { cookie: `services_at=${at}` });
+        assert.match(set, /ov_token=[^;]+;.*HttpOnly/i);
+        assert.match(set, /ov_refresh=[^;]+;.*HttpOnly/i);
+        assert.match(set, /services_at=;/, 'the legacy access cookie is cleared once the SDK session is written');
+        const at = set.match(/ov_token=([^;]+)/)[1];
+        const me = await t.get('/auth/me', { cookie: `ov_token=${at}` });
         assert.strictEqual(me.json().user.username, 'kim');
         assert.ok(!me.text.includes(at), '/auth/me never returns the token');
+        const legacy = await t.get('/auth/me', { cookie: `services_at=${t.network.userToken(user)}` });
+        assert.strictEqual(legacy.json().user.username, 'kim');
     });
 
-    await check('a wrong state or a verifier that does not match is refused', async () => {
+    await check('a lost flow or a used code recovers once, then shows the page (never a bare line)', async () => {
         const login = await t.get('/auth/login');
         const loc = new URL(login.headers.get('location'));
-        const flowCookie = login.headers.get('set-cookie').split(';')[0];
+        const flowCookie = cookieHeader(login);
         const code = t.network.issueCode(user, loc.searchParams.get('code_challenge'));
-        const bad = await t.get(`/auth/callback?code=${code}&state=${'0'.repeat(32)}`, { cookie: flowCookie });
-        assert.strictEqual(bad.status, 400);
+        const lost = await t.get(`/auth/callback?code=${code}&state=${loc.searchParams.get('state')}`);
+        assert.strictEqual(lost.status, 302, 'a lost flow starts the sign-in once more');
+        assert.strictEqual(lost.headers.get('location'), '/auth/login');
+        assert.match(lost.headers.get('set-cookie'), /ov_oauth_retry=1/);
+        const again = await t.get(`/auth/callback?code=${code}&state=${loc.searchParams.get('state')}`, { cookie: 'ov_oauth_retry=1' });
+        assert.strictEqual(again.status, 400);
+        assert.match(again.text, /Try again/);
         const other = t.network.issueCode(user, crypto.createHash('sha256').update('another-verifier').digest('base64url'));
         const mismatch = await t.get(`/auth/callback?code=${other}&state=${loc.searchParams.get('state')}`, { cookie: flowCookie });
-        assert.strictEqual(mismatch.status, 400, 'Network refuses the PKCE check; Services reports it');
-        const noCookie = await t.get(`/auth/callback?code=${code}&state=${loc.searchParams.get('state')}`);
-        assert.strictEqual(noCookie.status, 400);
+        assert.strictEqual(mismatch.status, 302, 'a code the Network refuses starts the sign-in once more');
+        const mismatchAgain = await t.get(`/auth/callback?code=${other}&state=${loc.searchParams.get('state')}`, { cookie: `${flowCookie}; ov_oauth_retry=1` });
+        assert.strictEqual(mismatchAgain.status, 400, 'the second failure shows the page');
     });
 
     await check('next= only accepts same-site paths', async () => {
         const r = await t.get('/auth/login?next=//evil.example/x');
-        const flow = decodeURIComponent(r.headers.get('set-cookie').match(/services_oauth=([^;]+)/)[1]);
-        assert.strictEqual(JSON.parse(flow).next, '/');
+        const nextCookie = r.headers.getSetCookie().find((c) => c.startsWith('ov_oauth_next='));
+        assert.ok(!nextCookie || /^ov_oauth_next=;/.test(nextCookie), 'nothing off-site is remembered as next');
+        const loc = new URL(r.headers.get('location'));
+        assert.strictEqual(loc.searchParams.get('client_id'), 'services');
     });
 
     await check('forms need the form token and a same-site Origin', async () => {
@@ -69,7 +85,7 @@ const { boot, check, done } = require('./helpers/boot');
         assert.strictEqual(ok.status, 303);
     });
 
-    await check('readiness is truthful: required db + docs; Network, relay and client are optional', async () => {
+    await check('readiness is truthful: required db, docs and OAuth client; Network and relay optional', async () => {
         const r = await t.get('/api/ready');
         const b = r.json();
         assert.strictEqual(r.status, 200);
@@ -79,6 +95,8 @@ const { boot, check, done } = require('./helpers/boot');
         assert.strictEqual(b.checks.network.status, 'ok');
         assert.strictEqual(b.checks.events_relay.status, 'fail', 'EVENTS_URL is unset in this boot, and it says so');
         assert.ok(b.degraded.includes('events_relay'));
+        assert.strictEqual(b.checks.oauth_client.status, 'ok');
+        assert.strictEqual(b.checks.oauth_client.required, true);
     });
 
     await check('/release.json and /metrics (loopback only)', async () => {
