@@ -23,7 +23,7 @@ const express = require('express');
 const { asyncRouter } = require('./router');
 const { createDiscoveryRoutes, homeJsonLd, COMMUNITY, CODES_ORIGIN } = require('./discovery');
 const { html, raw, render, table, code, badge, time, notice, csrfField, problemBox } = require('../render/html');
-const { pickBlock, pickRules, foldBlock } = require('../render/short');
+const { foldBlock } = require('../render/short');
 const { send } = require('../render/layout');
 const { markdown } = require('../render/markdown');
 const { csrfToken, checkCsrf, sameOrigin } = require('../auth/forms');
@@ -63,14 +63,14 @@ function createPageViews(ctx) {
         // the hero with two actions and code that runs, the numbers as one strip, the building blocks as a launcher,
         // the examples and the path, and what is read once (more code, the limits, releases) folded.
         const limitsFold = limitRows.length ? kit.fold({
-            id: 'limits', title: 'What a project gets', meta: 'free today',
+            id: 'limits', title: 'What a project gets', meta: 'free today', open: true,
             body: showcase.limits({
                 lede: 'No plan to buy and no card to add. What a project gets is its limits, and these are the numbers OpenVibe.Events enforces for every project.',
                 columns: ['Sandbox', 'Production'], rows: limitRows, source: eventsSource && eventsSource.public,
             }).replace(/^<section class="sc-sec">/, '').replace(/<\/section>$/, ''),
         }) : '';
         const releasesFold = recent.length ? kit.fold({
-            id: 'releases', title: 'Recent releases', meta: `${recent.length} newest`,
+            id: 'releases', title: 'Recent releases', meta: `${recent.length} newest`, open: true,
             body: render(table(['App', 'Kind', 'Version', 'Status', 'Trust', 'Published'], recent.map((x) => [
                 html`<a href="/apps/${x.app_id}">${x.name}</a>`, x.kind, html`<a href="/releases/${x.id}">${x.version}</a>`, x.status, x.trust.tier, time(x.published_at),
             ]))),

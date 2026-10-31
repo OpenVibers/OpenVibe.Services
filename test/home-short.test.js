@@ -1,7 +1,7 @@
 'use strict';
 /**
- * The home on a phone (the owner's short-pages rule, 2026-10-30): the parts a reader rarely needs are folds: closed on
- * a phone, open where there is room, and their content stays in the page for crawlers.
+ * The home on a phone (the owner's rule, 2026-10-31): a fold may hold a part read once, but it starts open on every
+ * screen so nothing is hidden on a phone. The content stays in the page for crawlers.
  */
 const assert = require('assert');
 const fs = require('fs');
@@ -10,7 +10,7 @@ const { boot, check, done } = require('./helpers/boot');
 
 (async () => {
     const t = await boot();
-    await check('the home on a phone: the parts read once are folds', async () => {
+    await check('the home on a phone: the parts read once are folds that start open', async () => {
         const r = await t.get('/');
         assert.strictEqual(r.status, 200);
         const text = r.text;
@@ -18,7 +18,11 @@ const { boot, check, done } = require('./helpers/boot');
         // The folds: open in the page, closed on a phone, and their content stays in the page.
         for (const id of ['how', 'reference', 'faq', 'network', 'shipped']) {
             assert.ok(text.includes(`<details class="svc-fold svc-fold-block" id="${id}" open>`), `${id} is a fold, open in the page`);
-            assert.ok(text.includes(`document.getElementById("${id}")`), `${id} has the script that closes it on a phone`);
+            assert.ok(!text.includes(`document.getElementById("${id}")`), `${id} is never closed by script`);
+        }
+        for (const id of ['limits', 'releases']) {
+            const m = text.match(new RegExp(`<details class="ovk-fold" id="${id}"( open)?>`));
+            if (m) assert.ok(m[1], `the ${id} fold starts open`);
         }
         // The content of every fold is still in the page.
         assert.ok(text.includes('Create a project'), 'the path from account to integration is still in the page');
