@@ -98,7 +98,7 @@ const { boot, check, done } = require('./helpers/boot');
             t.ctx.limits = { bySource: (s) => (s === 'events' ? { service: 'events', public: 'https://openvibe.events/limits.json' } : null), read: async () => ({ body: { limits: [{ label: 'Events published per minute', sandbox: 30, production: 120, unit: 'per_minute' }] } }) };
             r = await t.get('/');
             assert.match(r.text, /<dt><a href="https:\/\/openvibe\.network\/status">services up now, of 38 checked<\/a><\/dt><dd>37<\/dd>/, 'services up once Network answered');
-            assert.match(r.text, /<details class="ovk-fold" id="limits">[\s\S]*?<td>30 a minute<\/td><td>120 a minute<\/td>[\s\S]*?openvibe\.events\/limits\.json[\s\S]*?<\/details>/, 'the limits, folded, in plain units with their source');
+            assert.match(r.text, /<details class="ovk-fold" id="limits"( open)?>[\s\S]*?<td>30 a minute<\/td><td>120 a minute<\/td>[\s\S]*?openvibe\.events\/limits\.json[\s\S]*?<\/details>/, 'the limits, folded and open, in plain units with their source');
             assert.strictEqual((r.text.match(/<section[\s>]/g) || []).length, (r.text.match(/<\/section>/g) || []).length, 'the folded limits leave no section open');
         });
     } finally { await t.close(); }
