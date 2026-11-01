@@ -75,7 +75,7 @@ const sdkPkg = require('openvibe-sdk/package.json');
         const r = await t.get('/docs/events');
         const expected = new Set(contracts.services.manifests.flatMap((m) => m.eventsProduced || []));
         for (const e of expected) assert.ok(r.text.includes(`<code>${e}</code>`), e);
-        assert.strictEqual([...r.text.matchAll(/<tr><td><code>/g)].length, expected.size);
+        assert.strictEqual([...r.text.matchAll(/<tr><td[^>]*><code>/g)].length, expected.size);
     });
 
     await check('the SDK reference has one page per exported types entry, declarations verbatim', async () => {

@@ -183,8 +183,8 @@ const hmacV1 = (body, secret) => `sha256=${crypto.createHmac('sha256', secret).u
         assert.strictEqual(r.status, 200);
         assert.match(r.text, /X-OpenVibe-Signature-V2/);
         assert.match(r.text, /X-OpenVibe-Timestamp/);
-        assert.match(r.text, /<td><code>X-OpenVibe-Signature-V2<\/code><\/td>/);
-        assert.doesNotMatch(r.text, /<td><code>X-OpenVibe-Signature<\/code><\/td>/, 'no v1 header row in the sample');
+        assert.match(r.text, /<td[^>]*><code>X-OpenVibe-Signature-V2<\/code><\/td>/);
+        assert.doesNotMatch(r.text, /<td[^>]*><code>X-OpenVibe-Signature<\/code><\/td>/, 'no v1 header row in the sample');
         assert.match(r.text, /X-OpenVibe-Signature-V2: t=\d+,v2=[0-9a-f]{64}/, 'the curl replay carries v2');
         assert.doesNotMatch(r.text, /X-OpenVibe-Signature: /, 'no v1 header in the curl replay');
         assert.doesNotMatch(r.text, /sha256=[0-9a-f]{64}/);
