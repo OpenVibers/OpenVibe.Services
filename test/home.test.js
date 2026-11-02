@@ -64,7 +64,8 @@ const { boot, check, done } = require('./helpers/boot');
             assert.match(r.text, /sdk\.registry\.createRegistryClient\(ov\)/);
             assert.strictEqual((/<section class="sc-hero[\s\S]*?<\/section>/.exec(r.text)[0].match(/class="sc-btn/g) || []).length, 2, 'two hero actions');
             // The numbers are one kit.stats strip, each opening the reference it counts.
-            assert.match(r.text, /<dl class="ovk-stats" aria-label="The platform in numbers">/);
+            // Shared 4.91.1 makes the strip reachable by keyboard (tabindex) beside its label.
+            assert.match(r.text, /<dl class="ovk-stats" aria-label="The platform in numbers"( tabindex="0")?>/);
             assert.match(r.text, /<dt><a href="\/docs\/capabilities\?grantable=1">capabilities an app can request<\/a><\/dt><dd>\d+<\/dd>/);
             assert.match(r.text, /<dt><a href="\/docs\/events">event types to subscribe to<\/a><\/dt><dd>\d+<\/dd>/);
             assert.ok(!/services up now/.test(r.text), 'no services-up number while Network\'s status was not read');
