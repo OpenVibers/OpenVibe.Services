@@ -208,6 +208,7 @@ function createDiscoveryRoutes(ctx) {
             { title: 'robots.txt', url: abs('/robots.txt'), note: 'search and AI crawlers are welcome on the public pages' },
             { title: 'Full text for language models', url: abs('/llms-full.txt'), note: 'every fixed public page, one line each' },
             { title: 'Release metadata (JSON)', url: abs('/release.json'), note: 'this service\'s current release, per ADR-016' },
+            { title: 'MCP server (the whole network, read-only)', url: abs('/mcp'), note: 'POST JSON-RPC: openvibe_sites, openvibe_operations, openvibe_get (anonymous GETs of documented operations)' },
         ];
         if (firstContract) machine.push({ title: 'Contract JSON Schema', url: abs(`/docs/contracts/${firstContract}.json`), note: 'append .json to any contract page for its schema' });
         if (firstService) machine.push({ title: 'Service OpenAPI', url: abs(`/docs/api/${firstService}.json`), note: 'append .json to any API explorer page for its OpenAPI document' });

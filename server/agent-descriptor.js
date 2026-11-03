@@ -11,6 +11,8 @@ module.exports = {
     api: '/api/v1',
     openapi: '/docs/api/services.json',
     docs: '/docs',
+    // The network as one read-only MCP server: its sites, their documented GET operations, an anonymous call (AGT-2).
+    mcp: { url: '/mcp' },
     policy: {
         auth: ['none', 'Network OIDC', 'bearer'],
         rateLimit: '300 page requests and 240 API requests a minute per address; sign-in 60 attempts per 15 minutes',
