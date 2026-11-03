@@ -245,6 +245,11 @@ async function createApp(opts = {}) {
         },
     }));
 
+    // ── The network as one read-only MCP server (AGT-2, server/http/network-mcp.js) ──
+    // POST /mcp: list the open sites, a site's documented GET operations, and call one anonymously. Its own limit.
+    app.use('/mcp', rateLimit({ windowMs: 60_000, limit: Number(process.env.SERVICES_MCP_PER_MIN) || 60, standardHeaders: true, legacyHeaders: false }));
+    app.use(require('./http/network-mcp').createNetworkMcp({ config, fetchImpl: fetchImpl || globalThis.fetch, now: store.now, log }));
+
     // ── API ─────────────────────────────────────────────────
     app.use('/api/v1', createApi(ctx));
     app.use('/api', (req, res) => contracts.http.sendProblem(res, 404, 'route.not_found', { detail: 'No such API route', ctx: req.ov }));
