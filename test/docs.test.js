@@ -28,6 +28,18 @@ const sdkPkg = require('openvibe-sdk/package.json');
         assert.ok(contracts.resolve('services.app-manifest@1'));
     });
 
+    await check('the docs pages have the Markdown twins they name (11-03: /docs/contracts and the rest answered 404)', async () => {
+        for (const p of ['/docs/contracts', '/docs/capabilities', '/docs/events', '/docs/sdk', '/docs/contracts/errors.problem', '/docs/sdk/core']) {
+            const page = await t.get(p);
+            assert.match(page.headers.get('link') || page.text, /text\/markdown/, `${p} names a twin`);
+            const twin = await t.get(`${p}.md`);
+            assert.strictEqual(twin.status, 200, `${p}.md`);
+            assert.match(twin.headers.get('content-type') || '', /^text\/markdown/, `${p}.md is Markdown`);
+            assert.ok(!/<\/?(div|table|td|tr|section)\b/i.test(twin.text), `${p}.md is Markdown, not HTML`);
+        }
+        assert.strictEqual((await t.get('/docs/contracts/no-such-contract.md')).status, 404, 'no page, no twin');
+    });
+
     await check('every docs page states the versions it was generated from', async () => {
         for (const p of ['/docs', '/docs/contracts', '/docs/capabilities', '/docs/events', '/docs/sdk', '/docs/contracts/errors.problem', '/docs/sdk/core']) {
             const r = await t.get(p);

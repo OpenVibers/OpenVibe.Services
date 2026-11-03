@@ -224,12 +224,12 @@ function createDiscoveryRoutes(ctx) {
                 ] },
                 { title: 'Reference', links: [
                     { title: 'API explorer', url: abs('/docs/api'), note: 'each service\'s OpenAPI document, per page as .json' },
-                    { title: 'Contracts', url: abs('/docs/contracts'), html: true, note: 'schemas, field tables and fixtures, per page as .json' },
-                    { title: 'Capabilities', url: abs('/docs/capabilities'), html: true },
-                    { title: 'Events', url: abs('/docs/events'), html: true },
-                    { title: 'Services', url: abs('/docs/services'), html: true },
-                    { title: 'Tools', url: abs('/docs/tools'), html: true },
-                    { title: 'SDK', url: abs('/docs/sdk'), html: true },
+                    { title: 'Contracts', url: abs('/docs/contracts'), note: 'schemas, field tables and fixtures, per page as .json' },
+                    { title: 'Capabilities', url: abs('/docs/capabilities') },
+                    { title: 'Events', url: abs('/docs/events') },
+                    { title: 'Services', url: abs('/docs/services') },
+                    { title: 'Tools', url: abs('/docs/tools') },
+                    { title: 'SDK', url: abs('/docs/sdk') },
                 ] },
                 { title: 'Extend OpenVibe', links: [
                     { title: 'Mod the network', url: abs('/mod'), note: 'every way to extend OpenVibe today, and where packaged mods stand' },

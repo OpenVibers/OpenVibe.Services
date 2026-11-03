@@ -61,7 +61,7 @@ const PRIVATE = ['/projects', '/staff', '/auth/', '/oauth/test-callback'];
             assert.ok(/\n## Optional\n/.test(r.text), 'no Optional section');
             assert.strictEqual(r.text.lastIndexOf('\n## '), r.text.indexOf('\n## Optional'), 'Optional is the last section');
             // A page whose twin answers 404 keeps its URL and says (HTML); a file keeps its URL.
-            assert.ok(r.text.includes('(https://openvibe.services/docs/contracts) (HTML)'), 'the twin-less contracts page is marked (HTML)');
+            assert.ok(r.text.includes('(https://openvibe.services/docs/contracts.md)') && r.text.includes('(https://openvibe.services/oauth) (HTML)'), 'the docs pages link their twins; a page with none is marked (HTML)');
             assert.ok(!/\]\(https:\/\/openvibe\.services\/mcp\)/.test(r.text), '/mcp must not be a page link');
             assert.ok(/MCP server: POST https:\/\/openvibe\.services\/mcp/.test(r.text), 'the MCP endpoint is named in the details');
             const own = [...r.text.matchAll(/\]\((https:\/\/openvibe\.services[^)\s]*)\)( \(HTML\))?/g)];
