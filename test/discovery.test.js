@@ -47,12 +47,29 @@ const PRIVATE = ['/projects', '/staff', '/auth/', '/oauth/test-callback'];
             assert.match(r.headers.get('content-type'), /^text\/plain/);
             assert.match(r.headers.get('cache-control') || '', /public, max-age=\d+/);
             assert.ok(r.text.startsWith('# OpenVibe.Services'), 'no title');
-            assert.ok(r.text.includes('(https://openvibe.services/docs)'), 'no reference link');
+            assert.ok(r.text.includes('(https://openvibe.services/docs.md)'), 'no reference link at its twin');
             assert.ok(r.text.includes('(https://openvibe.codes/harnesses)'), 'llms.txt points at the harness catalog on openvibe.codes');
             assert.ok(r.text.includes('https://openvibe.services/sitemap.xml'), 'sitemap not listed');
             assert.ok(r.text.includes('(https://openvibe.services/llms-full.txt)'), 'llms-full.txt not listed');
             for (const p of PRIVATE) assert.ok(!r.text.includes(`https://openvibe.services${p}`), `private path in llms.txt: ${p}`);
             assert.ok(!r.text.includes('https://openvibe.services/api/'), 'api path in llms.txt');
+        });
+
+        await check('llms.txt: every page at its Markdown twin, and an Optional section last (AGT-5)', async () => {
+            const r = await t.get('/llms.txt');
+            assert.ok(r.text.includes('(https://openvibe.services/index.md)'), 'the home is /index.md');
+            assert.ok(/\n## Optional\n/.test(r.text), 'no Optional section');
+            assert.strictEqual(r.text.lastIndexOf('\n## '), r.text.indexOf('\n## Optional'), 'Optional is the last section');
+            // A page whose twin answers 404 keeps its URL and says (HTML); a file keeps its URL.
+            assert.ok(r.text.includes('(https://openvibe.services/docs/contracts) (HTML)'), 'the twin-less contracts page is marked (HTML)');
+            assert.ok(!/\]\(https:\/\/openvibe\.services\/mcp\)/.test(r.text), '/mcp must not be a page link');
+            assert.ok(/MCP server: POST https:\/\/openvibe\.services\/mcp/.test(r.text), 'the MCP endpoint is named in the details');
+            const own = [...r.text.matchAll(/\]\((https:\/\/openvibe\.services[^)\s]*)\)( \(HTML\))?/g)];
+            assert.ok(own.length > 10, String(own.length));
+            for (const [, url, html] of own) {
+                const p = new URL(url).pathname;
+                assert.ok(p.endsWith('.md') || /\.[a-z0-9]+$/.test(p) || html, `${url} is a twin, a file or marked (HTML)`);
+            }
         });
 
         await check('llms-full.txt: 200 text/plain, the site title, and every page the sitemap lists', async () => {
