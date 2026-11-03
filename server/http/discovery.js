@@ -203,52 +203,58 @@ function createDiscoveryRoutes(ctx) {
     r.get('/llms.txt', (_req, res) => {
         const firstContract = docs.contracts[0] ? docs.contracts[0].id : null;
         const firstService = (contracts.openapi.index()[0] || {}).service || null;
-        const machine = [
-            { title: 'Sitemap', url: abs('/sitemap.xml'), note: 'the public pages below, each with a real lastmod' },
-            { title: 'robots.txt', url: abs('/robots.txt'), note: 'search and AI crawlers are welcome on the public pages' },
-            { title: 'Full text for language models', url: abs('/llms-full.txt'), note: 'every fixed public page, one line each' },
-            { title: 'Release metadata (JSON)', url: abs('/release.json'), note: 'this service\'s current release, per ADR-016' },
-            { title: 'MCP server (the whole network, read-only)', url: abs('/mcp'), note: 'POST JSON-RPC: openvibe_sites, openvibe_operations, openvibe_get (anonymous GETs of documented operations)' },
-        ];
+        // The API documents are what an agent came for, so they stay in a main section; the .json URLs are files and
+        // keep their URL in either place.
+        const machine = [];
         if (firstContract) machine.push({ title: 'Contract JSON Schema', url: abs(`/docs/contracts/${firstContract}.json`), note: 'append .json to any contract page for its schema' });
         if (firstService) machine.push({ title: 'Service OpenAPI', url: abs(`/docs/api/${firstService}.json`), note: 'append .json to any API explorer page for its OpenAPI document' });
+        // Pages whose Markdown twin answers 404 (llms-twins-probe, 11-03) keep their URL and are marked (HTML).
         res.type('text/plain').set('Cache-Control', cache.htmlHeaders({ maxAge: 3600 })).send(seo.llmsTxt({
             name: SITE_NAME,
+            // Each of this site's own pages is linked at its Markdown twin (AGT-5; openvibe-shared 4.108.0 leaves
+            // files, /api/ and /.well-known/ paths and other sites' links as they are).
+            markdown: true,
+            base: site,
             summary: 'OpenVibe.Services: the open developer platform of OpenVibe — projects, apps, scoped credentials and capability grants over OpenVibe.Network\'s API, usage and project export, app and mod releases, one resource index over every service, reference documentation generated from the pinned contracts and SDK, and OAuth, webhook and manifest tools.',
-            details: 'Every page is server-rendered and readable without JavaScript, and every one is public: no account is needed to read the docs or use the OAuth, webhook and manifest tools. Projects, apps, credentials and grants belong to OpenVibe.Network; the pages that manage them need a signed-in OpenVibe account and are deliberately not listed here or in the sitemap. The reference under /docs is generated at boot from the exact openvibe-contracts and openvibe-sdk versions the platform runs, so it cannot drift from them.',
+            details: 'Every page is server-rendered and readable without JavaScript, and every one is public: no account is needed to read the docs or use the OAuth, webhook and manifest tools. Projects, apps, credentials and grants belong to OpenVibe.Network; the pages that manage them need a signed-in OpenVibe account and are deliberately not listed here or in the sitemap. The reference under /docs is generated at boot from the exact openvibe-contracts and openvibe-sdk versions the platform runs, so it cannot drift from them. MCP server: POST https://openvibe.services/mcp (JSON-RPC; tools openvibe_sites, openvibe_operations and openvibe_get, anonymous GETs of documented operations) — an endpoint, not a page.',
             sections: [
                 { title: 'Start here', links: [
                     { title: 'The developer platform', url: abs('/'), note: 'what the platform is for and how an account becomes an integration' },
                     { title: 'Reference documentation', url: abs('/docs'), note: 'generated from the pinned contracts and SDK' },
-                    { title: 'What shipped on OpenVibe.Services', url: abs('/updates') },
-                    { title: 'Transparency', url: abs('/policy/transparency'), note: 'what the portal stores, what it does not, and what works today' },
                 ] },
                 { title: 'Reference', links: [
                     { title: 'API explorer', url: abs('/docs/api'), note: 'each service\'s OpenAPI document, per page as .json' },
-                    { title: 'Contracts', url: abs('/docs/contracts'), note: 'schemas, field tables and fixtures, per page as .json' },
-                    { title: 'Capabilities', url: abs('/docs/capabilities') },
-                    { title: 'Events', url: abs('/docs/events') },
-                    { title: 'Services', url: abs('/docs/services') },
-                    { title: 'Tools', url: abs('/docs/tools') },
-                    { title: 'Coding harnesses', url: 'https://openvibe.codes/harnesses', note: 'the coding agents OpenVibe.Codes routes a task to (another site)' },
-                    { title: 'SDK', url: abs('/docs/sdk') },
+                    { title: 'Contracts', url: abs('/docs/contracts'), html: true, note: 'schemas, field tables and fixtures, per page as .json' },
+                    { title: 'Capabilities', url: abs('/docs/capabilities'), html: true },
+                    { title: 'Events', url: abs('/docs/events'), html: true },
+                    { title: 'Services', url: abs('/docs/services'), html: true },
+                    { title: 'Tools', url: abs('/docs/tools'), html: true },
+                    { title: 'SDK', url: abs('/docs/sdk'), html: true },
                 ] },
                 { title: 'Extend OpenVibe', links: [
                     { title: 'Mod the network', url: abs('/mod'), note: 'every way to extend OpenVibe today, and where packaged mods stand' },
                 ] },
                 { title: 'Developer tools', links: [
-                    { title: 'OAuth callback helper', url: abs('/oauth'), note: 'authorization code + PKCE, with a callback that never exchanges the code' },
-                    { title: 'Webhook signature tester', url: abs('/tools/webhooks'), note: 'decides as a receiver requiring signature v2 does' },
-                    { title: 'Manifest validation', url: abs('/manifests/validate'), note: 'app and mod manifests, validated against the pinned contracts' },
-                ] },
-                { title: 'Policy', links: [
-                    { title: 'Policy home', url: abs('/policy') },
-                    { title: 'Proposals and decisions', url: abs('/policy/rfc') },
-                    { title: 'Compatibility and deprecation', url: abs('/policy/compatibility') },
-                    { title: 'Licensing', url: abs('/policy/licensing') },
-                    ...COMMUNITY.map((g) => ({ title: g.title, url: `${CODES_ORIGIN}/policy/${g.slug}`, note: 'on OpenVibe.Codes' })),
+                    { title: 'OAuth callback helper', url: abs('/oauth'), html: true, note: 'authorization code + PKCE, with a callback that never exchanges the code' },
+                    { title: 'Webhook signature tester', url: abs('/tools/webhooks'), html: true, note: 'decides as a receiver requiring signature v2 does' },
+                    { title: 'Manifest validation', url: abs('/manifests/validate'), html: true, note: 'app and mod manifests, validated against the pinned contracts' },
                 ] },
                 { title: 'Machine-readable', links: machine },
+            ],
+            // llmstxt.org's "## Optional": what an agent may skip when it needs a shorter context.
+            optional: [
+                { title: 'What shipped on OpenVibe.Services', url: abs('/updates') },
+                { title: 'Sitemap', url: abs('/sitemap.xml'), note: 'the public pages above, each with a real lastmod' },
+                { title: 'robots.txt', url: abs('/robots.txt'), note: 'search and AI crawlers are welcome on the public pages' },
+                { title: 'Full text for language models', url: abs('/llms-full.txt'), note: 'every fixed public page, one line each' },
+                { title: 'Release metadata (JSON)', url: abs('/release.json'), note: 'this service\'s current release, per ADR-016' },
+                { title: 'Policy home', url: abs('/policy') },
+                { title: 'Proposals and decisions', url: abs('/policy/rfc') },
+                { title: 'Compatibility and deprecation', url: abs('/policy/compatibility') },
+                { title: 'Licensing', url: abs('/policy/licensing') },
+                { title: 'Transparency', url: abs('/policy/transparency'), note: 'what the portal stores, what it does not, and what works today' },
+                ...COMMUNITY.map((g) => ({ title: g.title, url: `${CODES_ORIGIN}/policy/${g.slug}`, note: 'on OpenVibe.Codes' })),
+                { title: 'Coding harnesses', url: 'https://openvibe.codes/harnesses', note: 'the coding agents OpenVibe.Codes routes a task to (another site)' },
             ],
         }));
     });
