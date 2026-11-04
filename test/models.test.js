@@ -80,6 +80,21 @@ const lib = require('../server/domain/model-catalog');
             assert.match(alias.text, /Policy <b>cheapest<\/b>/);
         });
 
+        await check('the guide: start, ids against names, the disclosure, prices worked out exactly, errors', async () => {
+            const res = await t.get('/docs/ai');
+            assert.strictEqual(res.status, 200);
+            assert.match(res.text, /noindex/);
+            assert.match(res.text, /never swapped for another quantization/);
+            assert.match(res.text, /<code>openvibe\/private<\/code>/);
+            assert.match(res.text, /<code>resolved_model<\/code>/);
+            // 1,200 x $0.04/M + 8,000 x $0.01/M + 400 x $0.12/M = 48,000 + 80,000 + 48,000 nano = $0.000176.
+            assert.match(res.text, /costs <b>\$0\.000176<\/b>/);
+            assert.match(res.text, /<code>ai\.model_unavailable<\/code>/);
+            delete process.env.SERVICES_MODEL_EXPLORER;
+            assert.strictEqual((await t.get('/docs/ai')).status, 404, 'off: no guide either');
+            process.env.SERVICES_MODEL_EXPLORER = '1';
+        });
+
         await check('compare: two to four, the cheapest marked per workload', async () => {
             const a = 'qwen/qwen3-4b-abliterated:q4_k_m@preview';
             const b = 'google/gemma-3-27b-abliterated:q4_k_m@preview';
