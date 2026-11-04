@@ -37,6 +37,7 @@ const ACCESS = {
 const AVAILABILITY = {
     available: ['Available', 'ok'], planned: ['Planned', 'off'], pending_agreement: ['Pending agreement', 'off'],
     byok_only: ['With your own key', 'new'], degraded: ['Degraded', 'warn'],
+    limited: ['Limited', 'warn'], unavailable: ['Not available yet', 'off'], deprecated: ['Deprecated', 'off'],
 };
 
 /** Workloads a price is shown for: tokens of each class in one request. */
@@ -90,16 +91,50 @@ function usd(nano, { per = null } = {}) {
 /** A per-million rate as dollars per million tokens. */
 const perMillion = (nanoPerM) => usd(nanoPerM);
 
+/**
+ * One entry of the catalog in the shape the pages use, from ai.model@1 as OpenVibe.AI serves it (openvibe-contracts
+ * v0.284.0): capabilities and supports are objects of booleans, the price is retail_rate's flat nano-USD fields,
+ * availability is available | limited | unavailable | deprecated, and what the AI Exchange adds beyond the schema
+ * (who supplies it, lineage, hardware, quality) rides in metadata. The older field names are read too.
+ */
 function normalize(m) {
     if (!m || typeof m !== 'object' || !m.id) return null;
+    const md = (m.metadata && typeof m.metadata === 'object') ? m.metadata : {};
+    const dynamic = m.dynamic === true || (/^openvibe(\/|$)/.test(m.id) && !m.id.includes('@'));
+    const capObj = (!Array.isArray(m.capabilities) && m.capabilities) || null;
+    const sup = m.supports || {};
+    const caps = Array.isArray(m.capabilities) ? m.capabilities
+        : Object.keys(CAPABILITY_KEYS).filter((k) => (capObj && capObj[k]) || sup[CAPABILITY_KEYS[k]]);
+    const rr = m.retail_rate || null;
+    const retail = m.retail || (rr ? {
+        version: rr.version || null,
+        nano_usd_per_m: { input: rr.input_nano_usd_per_m, cached_read: rr.cached_read_nano_usd_per_m, cache_write: rr.cache_write_nano_usd_per_m, output: rr.output_nano_usd_per_m },
+        per_request_nano_usd: rr.per_request_nano_usd || md.per_request_nano_usd || '0',
+    } : null);
+    const note = md.availability_note;
+    const availability = AVAILABILITY[note] ? note : AVAILABILITY[m.availability] ? m.availability : 'planned';
+    const input = Array.isArray(m.modalities) ? (md.input_modalities || m.modalities) : ((m.modalities || {}).input || ['text']);
     return {
         ...m,
-        variant: VARIANTS[m.variant] ? m.variant : (m.dynamic ? null : 'original'),
-        capabilities: Array.isArray(m.capabilities) ? m.capabilities : [],
-        access: Array.isArray(m.access) ? m.access.filter((a) => ACCESS[a]) : [],
-        availability: AVAILABILITY[m.availability] ? m.availability : 'planned',
+        dynamic,
+        name: m.name || m.display_name || m.id,
+        org: m.org || md.org || m.provider_key || String(m.id).split('/')[0],
+        variant: dynamic ? null : (VARIANTS[m.variant] ? m.variant : 'original'),
+        capabilities: caps,
+        retail,
+        context_tokens: m.context_tokens || m.context || m.context_window || null,
+        max_output_tokens: m.max_output_tokens || m.max_output || null,
+        modalities: { input, output: ['text'] },
+        base_model: m.base_model !== undefined ? m.base_model : (md.base_model || null),
+        modification: m.modification || md.modification || null,
+        hardware: m.hardware || md.hardware || null,
+        quality: m.quality || md.quality || { score: null, samples: 0 },
+        access: (Array.isArray(m.access) ? m.access : Array.isArray(md.access) ? md.access : []).filter((a) => ACCESS[a]),
+        availability,
+        sha256: m.sha256 || null,
     };
 }
+const CAPABILITY_KEYS = { tools: 'tools', json: 'json', vision: 'vision', stream: 'streaming' };
 
 function filterModels(models, q = {}) {
     const text = String(q.q || '').trim().toLowerCase();

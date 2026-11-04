@@ -37,6 +37,10 @@ const lib = require('../server/domain/model-catalog');
         assert.strictEqual(source, 'preview');
         assert.ok(models.length >= 5 && aliases.every((a) => a.dynamic && a.id.startsWith('openvibe/')));
         assert.ok(models.every((m) => /^[a-z0-9-]+\/[a-z0-9.-]+(:[a-z0-9_]+)?@[a-z0-9]+$/.test(m.id)), 'every id is exact (D3)');
+        const contracts = require('openvibe-contracts');
+        const raw = require('../server/fixtures/ai-models.preview.json').models;
+        for (const m of raw) { const v = contracts.validate('ai.model@1', m); assert.ok(v.valid, `${m.id}: ${JSON.stringify(v.errors).slice(0, 300)}`); }
+        assert.ok(models.every((m) => m.retail && m.retail.nano_usd_per_m && m.capabilities.length), 'normalized from the contract shape');
         assert.ok(lib.filterModels(models, { variant: 'abliterated' }).every((m) => m.variant === 'abliterated'));
         assert.ok(lib.filterModels(models, { cap: ['vision'] }).every((m) => m.capabilities.includes('vision')));
         assert.ok(lib.filterModels(models, { access: 'managed' }).every((m) => m.access.some((a) => a === 'OWN_DEPLOYMENT' || a === 'AUTHORIZED_WHOLESALE')));
