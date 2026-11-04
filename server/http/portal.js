@@ -944,7 +944,7 @@ ${r.result && r.kind === 'ai' ? aiResult(r.result) : r.result ? html`<pre tabind
     // ── Credits (AI Exchange D9): the project's prepaid balance and what it was spent on; Billing is the authority ──
     const creditsReader = ctx.creditsReader || require('../domain/credits').createCreditsReader({});
     r.get('/:project/credits', idParams, async (req, res, next) => {
-        if (process.env.SERVICES_MODEL_EXPLORER !== '1') return next();
+        if (!config.modelExplorer) return next();
         const project = await net(req, res, (t) => network.projects.get(t, req.params.project));
         if (!project.ok) return problemPage(req, res, project.problem, { back: '/projects' });
         const { usd } = require('../domain/model-catalog');
@@ -985,7 +985,7 @@ ${st.charges.map((c) => { const u = c.usage || {}; return html`<tr><td data-labe
 
     // ── Start with OpenVibe AI (AI Exchange P8): the steps to a first call, each read live, nothing stored ──
     r.get('/:project/ai', idParams, async (req, res, next) => {
-        if (process.env.SERVICES_MODEL_EXPLORER !== '1') return next();
+        if (!config.modelExplorer) return next();
         const project = await loadProject(req, res);
         if (!project) return;
         const base = `/projects/${project.id}`;

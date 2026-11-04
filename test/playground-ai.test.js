@@ -26,7 +26,6 @@ const http = require('http');
     });
     await new Promise((r) => ai.listen(0, '127.0.0.1', r));
     process.env.SERVICES_PLAYGROUND_AI_URL = `http://127.0.0.1:${ai.address().port}`;
-    process.env.SERVICES_AI_PLAYGROUND = '1';
     const { boot, check, done } = require('./helpers/boot');
     const { aiInput } = require('../server/domain/playground');
 
@@ -41,7 +40,7 @@ const http = require('http');
     // sandbox credit on them). The Network mock is started with it.
     const t = await boot({ network: { sandboxAudiences: ['openvibe.events', 'openvibe.media', 'openvibe.ai'] } });
     // The test boot builds its config from a fixed environment: the AI playground's switch and endpoint are set on it.
-    t.config.playground.ai = true;
+    await t.ctx.aiConfig.store.apply({ ai_playground: true }, { actor: { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ' }, reason: 'test: open the playground' });
     t.config.playground.aiUrl = process.env.SERVICES_PLAYGROUND_AI_URL;
     const owner = t.network.addUser('ana');
     const projectId = await t.project(owner, 'Ask');
@@ -86,7 +85,6 @@ const http = require('http');
         });
         }
     } finally {
-        delete process.env.SERVICES_AI_PLAYGROUND;
         await t.close();
         ai.close();
     }

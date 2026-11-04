@@ -43,10 +43,9 @@ const { daily } = require('../server/domain/credits');
     const projectId = await t.project(owner, 'Spend');
     try {
         await check('off by default', async () => {
-            delete process.env.SERVICES_MODEL_EXPLORER;
             assert.strictEqual((await t.get(`/projects/${projectId}/credits`, { as: owner })).status, 404);
         });
-        process.env.SERVICES_MODEL_EXPLORER = '1';
+        await t.ctx.aiConfig.store.apply({ model_explorer: true }, { actor: { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ' }, reason: 'test: open the explorer' });
         await check('the page: balance, held, available, the requests, with the person\'s own token', async () => {
             const r = await t.get(`/projects/${projectId}/credits`, { as: owner });
             assert.strictEqual(r.status, 200, r.text.slice(0, 300));
@@ -82,7 +81,6 @@ const { daily } = require('../server/domain/credits');
             assert.match(r.text, /Credits are not open yet\./);
         });
     } finally {
-        delete process.env.SERVICES_MODEL_EXPLORER;
         await t.close();
         billing.close();
     }

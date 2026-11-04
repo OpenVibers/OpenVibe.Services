@@ -160,7 +160,7 @@ function sortModels(models, by = 'price', workload = 'chat') {
 }
 
 function createModelCatalog({ config = {}, fetchImpl = globalThis.fetch, now = () => Date.now(), log = console } = {}) {
-    const source = String(process.env.SERVICES_MODEL_CATALOG_SOURCE || config.modelCatalogSource || 'preview');
+    const sourceOf = () => String(config.modelCatalogSource || 'preview');
     const aiUrl = String(process.env.OV_AI_PUBLIC_URL || config.aiUrl || 'https://ai.openvibe.services').replace(/\/+$/, '');
     let cache = { at: 0, value: null };
 
@@ -178,7 +178,7 @@ function createModelCatalog({ config = {}, fetchImpl = globalThis.fetch, now = (
     }
 
     async function list() {
-        if (source !== 'ai') return preview();
+        if (sourceOf() !== 'ai') return preview();
         if (cache.value && now() - cache.at < 60_000) return cache.value;
         try {
             cache = { at: now(), value: await fromAi() };
@@ -195,7 +195,7 @@ function createModelCatalog({ config = {}, fetchImpl = globalThis.fetch, now = (
         return [...all.models, ...all.aliases].find((m) => m.id === id) || null;
     }
 
-    return { list, get, source };
+    return { list, get, get source() { return sourceOf(); } };
 }
 
 module.exports = { createModelCatalog, cost, usd, perMillion, filterModels, sortModels, normalize, WORKLOADS, VARIANTS, ACCESS, AVAILABILITY, COMPONENTS };

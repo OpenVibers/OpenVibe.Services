@@ -19,7 +19,7 @@ function createAiDocsRoutes(appCtx) {
     const r = asyncRouter();
 
     r.get('/docs/ai', (req, res, next) => {
-        if (process.env.SERVICES_MODEL_EXPLORER !== '1') return next();
+        if (!config.modelExplorer) return next();
         const example = { retail: { nano_usd_per_m: { input: '40000000', cached_read: '10000000', cache_write: '40000000', output: '120000000' }, per_request_nano_usd: '0' } };
         const ex = { input: 1200, cached_read: 8000, cache_write: 0, output: 400 };
         const exCost = cost(example, ex);

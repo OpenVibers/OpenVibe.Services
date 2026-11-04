@@ -22,7 +22,7 @@ const CAPS = { tools: 'Tools', json: 'JSON', vision: 'Vision', stream: 'Streamin
 const COMPONENT_NAMES = { input: 'Input', cached_read: 'Cached input', cache_write: 'Cache write', output: 'Output' };
 const AI_URL = 'https://ai.openvibe.services';
 
-const enabled = () => process.env.SERVICES_MODEL_EXPLORER === '1';
+const enabled = (config) => !!config.modelExplorer;
 const badge = (text, tone) => html`<span class="mx-badge is-${tone || 'plain'}">${text}</span>`;
 const variantBadge = (m) => (m.variant ? badge(VARIANTS[m.variant], m.variant === 'abliterated' ? 'abl' : m.variant === 'original' ? 'plain' : 'tuned') : '');
 const accessBadges = (m) => m.access.map((a) => badge(ACCESS[a][0], ACCESS[a][1]));
@@ -43,7 +43,7 @@ function createModelRoutes(appCtx) {
         : data.problem ? html`<p class="mx-note is-bad" role="status">${data.problem.detail}</p>` : '');
 
     r.get('/models', async (req, res, next) => {
-        if (!enabled()) return next();
+        if (!enabled(config)) return next();
         const data = await catalog.list();
         const q = req.query || {};
         const workload = WORKLOADS[q.workload] ? q.workload : 'chat';
@@ -100,7 +100,7 @@ ${shown.length ? html`<div class="mx-table-wrap"><table class="mx-table">
     });
 
     r.get('/models/compare', async (req, res, next) => {
-        if (!enabled()) return next();
+        if (!enabled(config)) return next();
         const data = await catalog.list();
         const ids = [].concat(req.query.ids || []).map(String).slice(0, 4);
         const picked = ids.map((id) => data.models.find((m) => m.id === id)).filter(Boolean);
@@ -136,7 +136,7 @@ ${line('Quality', (m) => (m.quality && m.quality.score != null ? `${m.quality.sc
     });
 
     r.get('/models/:id', async (req, res, next) => {
-        if (!enabled()) return next();
+        if (!enabled(config)) return next();
         const data = await catalog.list();
         const m = await catalog.get(String(req.params.id));
         if (!m) return next();

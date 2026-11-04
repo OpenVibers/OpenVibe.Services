@@ -51,11 +51,11 @@ const lib = require('../server/domain/model-catalog');
     const t = await boot();
     try {
         await check('off by default: no page, no price promised', async () => {
-            delete process.env.SERVICES_MODEL_EXPLORER;
             assert.strictEqual((await t.get('/models')).status, 404);
         });
 
-        process.env.SERVICES_MODEL_EXPLORER = '1';
+        // The owner changes services.ai from the AI tab: the running process reads the store, live.
+        await t.ctx.aiConfig.store.apply({ model_explorer: true }, { actor: { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ' }, reason: 'test: open the explorer' });
         await check('the list: every model, a preview label, the aliases, filters that work without script', async () => {
             const res = await t.get('/models');
             assert.strictEqual(res.status, 200, res.text.slice(0, 300));
@@ -94,9 +94,9 @@ const lib = require('../server/domain/model-catalog');
             // 1,200 x $0.04/M + 8,000 x $0.01/M + 400 x $0.12/M = 48,000 + 80,000 + 48,000 nano = $0.000176.
             assert.match(res.text, /costs <b>\$0\.000176<\/b>/);
             assert.match(res.text, /<code>ai\.model_unavailable<\/code>/);
-            delete process.env.SERVICES_MODEL_EXPLORER;
+            await t.ctx.aiConfig.store.apply({ model_explorer: false }, { actor: { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ' }, reason: 'test: close it' });
             assert.strictEqual((await t.get('/docs/ai')).status, 404, 'off: no guide either');
-            process.env.SERVICES_MODEL_EXPLORER = '1';
+            await t.ctx.aiConfig.store.apply({ model_explorer: true }, { actor: { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ' }, reason: 'test: open it again' });
         });
 
         await check('compare: two to four, the cheapest marked per workload', async () => {
@@ -110,7 +110,6 @@ const lib = require('../server/domain/model-catalog');
             assert.match(one.text, /Pick two to four models/);
         });
     } finally {
-        delete process.env.SERVICES_MODEL_EXPLORER;
         await t.close();
     }
     done();
