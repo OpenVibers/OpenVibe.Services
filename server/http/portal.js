@@ -88,6 +88,7 @@ const atLeast = (role, need) => Boolean(role) && RANK[role] >= RANK[need];
 
 function createPortalRoutes(ctx) {
     const { config, docs, network, sso, releases, trust, playground, archiver, limits, actorLimits, log } = ctx;
+    const modelCatalog = ctx.modelCatalog || require('../domain/model-catalog').createModelCatalog({ config, log });
     const r = asyncRouter();
     const B = (name) => actorLimits.budget(name);
     const form = express.urlencoded({ extended: false, limit: '96kb' });
@@ -877,6 +878,14 @@ ${manage ? html`<h2>Revoke this app</h2><form method="post" action="${base}/revo
         const c = csrf(req);
         const events = playground.precheck(app, 'events');
         const media = playground.precheck(app, 'media');
+        // The AI playground (AI Exchange P8, SERVICES_AI_PLAYGROUND): models from OpenVibe AI's catalog when it is the
+        // source; until then only the dynamic name that runs today.
+        const ai = config.playground.ai ? playground.precheck(app, 'ai') : null;
+        let aiModels = [{ id: 'openvibe', name: 'Auto (OpenVibe picks)' }];
+        if (ai && modelCatalog.source === 'ai') {
+            const cat = await modelCatalog.list().catch(() => ({ models: [], aliases: [] }));
+            aiModels = [...cat.aliases, ...cat.models.filter((m) => m.availability === 'available')].map((m) => ({ id: m.id, name: m.name, variant: m.variant }));
+        }
         const credFields = html`<fieldset><legend>The app's credential (used for this request only, never stored)</legend>
 <label><input type="radio" name="credential_type" value="client_secret" checked> client secret — Services asks Network for a 5-minute token with it</label>
 <label><input type="radio" name="credential_type" value="access_token"> access token you minted for this app</label>
@@ -901,6 +910,13 @@ ${credFields}<button type="submit">Publish test event</button></form>` : ''}
 <p class="muted small">Needs <code>media.object.upload</code> (audience <code>openvibe.media</code>) for the project's namespace <code>${project.id}</code>. Endpoint: <code>${config.playground.mediaUrl}</code>. At most ${config.playground.maxUploadBytes} bytes.</p>
 ${pre(media)}${media.ok ? html`<form method="post" action="${base}/playground/media" enctype="multipart/form-data" class="stack">${csrfField(c)}
 <label>File <input type="file" name="file" required></label>${credFields}<button type="submit">Upload</button></form>` : ''}
+${ai ? html`<h2>${playground.KINDS.ai.label}</h2>
+<p class="muted small">Needs <code>ai.inference.create</code> (audience <code>openvibe.ai</code>). One reply, not streamed. The prompt and the answer are shown here once and never stored; the run log keeps the outcome only. Endpoint: <code>${config.playground.aiUrl}/v1/chat/completions</code>.</p>
+${pre(ai)}${ai.ok ? html`<form method="post" action="${base}/playground/ai" class="stack">${csrfField(c)}
+<label>Model <select name="model" data-ov-title="Model">${aiModels.map((m) => html`<option value="${m.id}"${values.model === m.id ? raw(' selected') : ''}${m.variant ? raw(` data-desc="${m.variant}"`) : ''}>${m.name}</option>`)}</select></label>
+<label>Prompt <textarea name="prompt" rows="4" maxlength="4000" required>${values.prompt || 'Say hello in five words.'}</textarea></label>
+<label>Longest reply (tokens) <input name="max_tokens" type="number" min="1" max="1024" value="${values.max_tokens || 256}"></label>
+${credFields}<button type="submit">Ask</button></form>` : ''}` : ''}
 <h2>Recent runs</h2>
 ${table(['When', 'Playground', 'Credential', 'Outcome', 'Stage', 'HTTP', 'Code', 'Detail', 'Result'], runs.map((x) => [
                 time(x.at), x.kind, x.credential, badge(x.outcome, x.outcome === 'ok' ? 'ok' : (x.outcome === 'failed' ? 'bad' : 'warn')), x.stage, x.http_status || '', x.code ? code(x.code) : '', x.detail, x.ref ? code(x.ref) : '',
@@ -911,7 +927,16 @@ ${table(['When', 'Playground', 'Credential', 'Outcome', 'Stage', 'HTTP', 'Code',
     function runResult(r) {
         return html`<div class="result ${r.outcome === 'ok' ? 'ok' : 'bad'}" role="status"><p><strong>${r.outcome === 'ok' ? 'Done.' : (r.outcome === 'refused' ? 'Refused.' : 'Failed.')}</strong> ${r.detail}</p>
 <p class="muted small">stage ${r.stage}${r.http_status ? ` · HTTP ${r.http_status}` : ''}${r.code ? html` · <code>${r.code}</code>` : ''}${r.runId ? html` · run <code>${r.runId}</code>` : ''}</p>
-${r.result ? html`<pre tabindex="0"><code>${JSON.stringify(r.result, null, 2)}</code></pre>` : ''}</div>`;
+${r.result && r.kind === 'ai' ? aiResult(r.result) : r.result ? html`<pre tabindex="0"><code>${JSON.stringify(r.result, null, 2)}</code></pre>` : ''}</div>`;
+    }
+
+    /** An AI reply: the answer, which model really answered and why (the openvibe disclosure), and the tokens. */
+    function aiResult(x) {
+        const o = x.openvibe || {};
+        const u = x.usage || {};
+        return html`<div class="ai-reply"><p class="muted small">Answered by <code>${o.resolved_model || x.model}</code>${o.revision ? html` @ <code>${o.revision}</code>` : ''}${o.provider_access ? html` · ${o.provider_access}` : ''}${o.policy ? html` · policy ${o.policy}` : ''}${o.fallback_reason ? html` · ${o.fallback_reason}` : ''}</p>
+<blockquote class="ai-answer">${x.reply || '(an empty reply)'}</blockquote>
+<p class="muted small">${u.prompt_tokens != null ? `${u.prompt_tokens} tokens in · ${u.completion_tokens} out` : 'No usage reported'}${x.finish_reason ? ` · ended: ${x.finish_reason}` : ''}${o.rate_version ? html` · price version <code>${o.rate_version}</code>` : ''}</p></div>`;
     }
 
     const statusFor = (out) => (out.outcome === 'ok' ? 200 : (out.stage === 'grant' || out.stage === 'app' ? 403 : (out.stage === 'input' ? 422 : (out.stage === 'rate' ? 429 : (out.stage === 'token' ? (out.http_status && out.http_status >= 400 ? out.http_status : 401) : 502)))));
@@ -929,6 +954,18 @@ ${r.result ? html`<pre tabindex="0"><code>${JSON.stringify(r.result, null, 2)}</
         });
         // The credential is NOT passed back: the form comes back with it empty.
         return await playgroundPage(req, res, { result: out, values: { event_type: b.event_type, subject_type: b.subject_type, subject_id: b.subject_id, payload: b.payload }, status: statusFor(out) });
+    });
+
+    r.post('/:project/apps/:app/playground/ai', idParams, B('services.playground.run'), form, guard, async (req, res) => {
+        const got = await net(req, res, (t) => network.projects.app(t, req.params.project, req.params.app));
+        if (!got.ok) return problemPage(req, res, got.problem, { back: appBase(req) });
+        const b = req.body || {};
+        const out = await playground.run({
+            actor: `user:${req.viewer.subject}`, app: got.data, kind: 'ai',
+            credential: { type: b.credential_type === 'access_token' ? 'access_token' : 'client_secret', value: typeof b.credential === 'string' ? b.credential.trim() : '' },
+            input: { model: b.model, prompt: b.prompt, max_tokens: b.max_tokens },
+        });
+        return await playgroundPage(req, res, { result: { ...out, kind: 'ai' }, values: { model: b.model, prompt: b.prompt, max_tokens: b.max_tokens }, status: statusFor(out) });
     });
 
     r.post('/:project/apps/:app/playground/media', idParams, B('services.playground.run'), async (req, res) => {
