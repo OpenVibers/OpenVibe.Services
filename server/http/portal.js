@@ -963,7 +963,10 @@ ${r.result && r.kind === 'ai' ? aiResult(r.result) : r.result ? html`<pre tabind
             const max = days.reduce((m, d) => (d.nano > m ? d.nano : m), 1n);
             const total = days.reduce((m, d) => m + d.nano, 0n);
             const n = (x) => Number(x || 0).toLocaleString('en-US');
+            // Sandbox credit (D10) is its own balance: it pays only for sandbox apps' test requests, never a real one.
+            const box = st.sandbox && st.sandbox.available_nano_usd != null ? st.sandbox : null;
             bodyMain = html`<div class="cr-tiles">${tile('Balance', st.balance_nano_usd)}${tile('Held now', st.held_nano_usd, 'by requests still running')}${tile('Available', st.available_nano_usd)}</div>
+${box ? html`<p class="cr-sandbox"><span class="mx-badge">Sandbox</span> <span><b>${usd(box.available_nano_usd)}</b> of test credit for your sandbox apps. It is not part of your balance and never pays for a real request.</span></p>` : ''}
 <section class="mx-card"><h2>Spent in the last 30 days <small class="cr-total">${usd(total)}</small></h2>
 <div class="cr-chart" role="img" aria-label="${`Spend per day for 30 days, ${usd(total)} in all`}">${days.map((d) => html`<span class="cr-bar" title="${`${d.day}: ${usd(d.nano)}`}"><span style="height:${d.nano === 0n ? 0 : Math.max(3, Number((d.nano * 100n) / max))}%"></span></span>`)}</div>
 <p class="mx-hint">${days[0].day} to ${days[days.length - 1].day}, UTC.</p></section>

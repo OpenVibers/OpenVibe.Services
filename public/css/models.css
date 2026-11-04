@@ -180,6 +180,8 @@
 .cr-tile span { color: var(--mx-soft); font-size: 13px; font-weight: 650; }
 .cr-tile b { font-size: clamp(1.3rem, 3vw, 1.8rem); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .cr-tile small { color: var(--mx-muted); font-size: 12.5px; }
+.cr-sandbox { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; color: var(--mx-soft); font-size: 14px; }
+.cr-sandbox b { color: var(--text-primary, #e8eef8); font-variant-numeric: tabular-nums; }
 .cr-total { color: var(--mx-soft); font-weight: 600; font-size: .85em; margin-left: 8px; }
 .cr-chart { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); align-items: end; gap: 3px; height: 140px; padding: 8px 0; border-bottom: 1px solid var(--mx-line); }
 .cr-bar { display: flex; align-items: flex-end; height: 100%; }

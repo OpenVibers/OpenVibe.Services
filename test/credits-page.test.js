@@ -18,6 +18,7 @@ const { daily } = require('../server/domain/credits');
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             project_id: 'x', balance_nano_usd: '4999896', held_nano_usd: '20000', available_nano_usd: '4979896',
+            sandbox: { balance_nano_usd: '1000000', held_nano_usd: '0', available_nano_usd: '1000000' },
             charges: [
                 { at: today, settlement_id: 'stl_1', service: 'ai', model: 'qwen/qwen3-4b:q4_k_m@3f2a1c9', charge_nano_usd: '104', shortfall_nano_usd: '0', byok: false, usage: { input_tokens: 1000, cached_read_tokens: 0, cache_write_tokens: 0, output_tokens: 1000 } },
                 { at: today, settlement_id: 'stl_2', service: 'ai', model: 'deepseek/deepseek-v3.2@preview', charge_nano_usd: '0', shortfall_nano_usd: '0', byok: true, usage: { input_tokens: 50, cached_read_tokens: 0, cache_write_tokens: 0, output_tokens: 9 } },
@@ -52,6 +53,7 @@ const { daily } = require('../server/domain/credits');
             assert.match(asked.at(-1).url, new RegExp(`^/api/me/credits\\?project_id=${projectId}$`));
             assert.match(asked.at(-1).auth, /^Bearer ey/, 'the person\'s own token');
             assert.match(r.text, /<span>Balance<\/span><b>\$0\.00499<\/b>/);
+            assert.match(r.text, /class="cr-sandbox"><span class="mx-badge">Sandbox<\/span> <span><b>\$0\.001<\/b> of test credit/, 'sandbox credit is shown apart, never in the balance');
             assert.match(r.text, /<span>Held now<\/span><b>\$0\.00002<\/b>/);
             assert.match(r.text, /<code class="mx-id">qwen\/qwen3-4b:q4_k_m@3f2a1c9<\/code>/);
             assert.match(r.text, /\$0\.000000104/);
