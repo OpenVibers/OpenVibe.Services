@@ -48,7 +48,8 @@ function createDocsViews(ctx) {
         if (s.$ref) {
             const key = String(s.$ref).replace('#/components/schemas/', '');
             const id = key.replace(/\.v\d+$/, '');
-            return docs.contract(id) ? html`<a href="/docs/contracts/${id}">${id}@${key.split('.v').pop()}</a>` : code(key);
+            const c = docs.contract(id, key.split('.v').pop()) || docs.contract(id);
+            return c ? html`<a href="${c.href}">${id}@${key.split('.v').pop()}</a>` : code(key);
         }
         if (s.anyOf) return html`one of ${s.anyOf.map((x, i) => html`${i ? ', ' : ''}${schemaLink(x)}`)}`;
         if (s.contentEncoding === 'binary') return 'bytes';
@@ -170,39 +171,43 @@ function createDocsRoutes(ctx) {
             body: html`<h1>Contracts</h1>${versions()}
 <p>A contract id is permanent. Minor versions only add optional fields; a breaking change is a new major with a deprecation window (<a href="/policy/compatibility">policy</a>).</p>
 ${table(['Contract', 'Version', 'Owner', 'Visibility', 'Status', 'Compatibility'], docs.contracts.map((c) => [
-                html`<a href="/docs/contracts/${c.id}">${c.id}</a>${c.deprecation ? html` ${badge('deprecated', 'warn')}` : ''}`,
+                html`<a href="${c.href}">${c.latest ? c.id : `${c.id}@${c.major}`}</a>${c.deprecation ? html` ${badge('deprecated', 'warn')}` : ''}`,
                 c.version, c.owner, c.visibility, c.status, c.compatibility,
             ]))}`,
         });
     });
 
+    // `<id>` is the latest major, `<id>@<major>` a named one.
+    const named = (raw) => {
+        const m = /^(.+)@(\d+)$/.exec(String(raw));
+        return m ? { id: m[1], major: m[2], c: docs.contract(m[1], m[2]) } : { id: String(raw), major: null, c: docs.contract(String(raw)) };
+    };
+
     r.get('/contracts/:id.json', (req, res, next) => {
-        const c = docs.contract(req.params.id);
+        const { c } = named(req.params.id);
         if (!c) return next();
         res.set('Cache-Control', PUBLIC_CACHE).type('application/schema+json').send(JSON.stringify(c.schema, null, 2));
     });
 
     r.get('/contracts/:id', (req, res, next) => {
-        // A contract named the way the platform writes it, `<name>@<major>` (actor.task-webhook@1): its page, when that
-        // major is the one documented here.
-        const versioned = /^(.+)@(\d+)$/.exec(String(req.params.id));
-        if (versioned) {
-            const named = docs.contract(versioned[1]);
-            if (named && named.version.split('.')[0] === versioned[2]) return res.redirect(301, `/docs/contracts/${encodeURIComponent(named.id)}`);
-            return next();
-        }
-        const c = docs.contract(req.params.id);
+        // A contract named the way the platform writes it, `<name>@<major>` (actor.task-webhook@1): the latest major
+        // redirects to the plain page; an older major still in the catalog has its own page; any other is 404.
+        const asked = named(req.params.id);
+        const c = asked.c;
         if (!c) return next();
-        const major = c.version.split('.')[0];
+        if (asked.major != null && c.latest) return res.redirect(301, `/docs/contracts/${encodeURIComponent(c.id)}`);
+        const major = c.major;
+        const current = c.latest ? null : docs.contract(c.id);
         const fixture = (f, ok) => html`<details${ok ? raw(' open') : ''}><summary>${ok ? 'Valid' : 'Rejected'}: ${f.name}</summary><pre tabindex="0"><code>${JSON.stringify(f.body, null, 2)}</code></pre></details>`;
         page(req, res, {
             title: `${c.id}@${major}`,
             description: c.description.slice(0, 200),
-            crumbs: [{ label: 'Docs', href: '/docs' }, { label: 'Contracts', href: '/docs/contracts' }, { label: c.id }],
+            crumbs: [{ label: 'Docs', href: '/docs' }, { label: 'Contracts', href: '/docs/contracts' }, { label: c.latest ? c.id : `${c.id}@${major}` }],
             body: html`<h1>${c.title} <small><code>${c.id}@${major}</code></small></h1>${versions()}
+${current ? html`<div class="notice">An older major, still in the catalog. The current one is <a href="${current.href}"><code>${c.id}@${current.major}</code></a>.</div>` : ''}
 <dl class="facts"><dt>Version</dt><dd>${c.version}</dd><dt>Owner</dt><dd>${c.owner}</dd><dt>Visibility</dt><dd>${c.visibility}</dd><dt>Status</dt><dd>${c.status}</dd>
 <dt>Compatibility</dt><dd>${c.compatibility}</dd>${c.adr ? html`<dt>Decision</dt><dd><a href="/docs/adr/${c.adr}">${c.adr}</a></dd>` : ''}
-<dt>Schema</dt><dd><a href="/docs/contracts/${c.id}.json"><code>${c.$id}</code></a></dd></dl>
+<dt>Schema</dt><dd><a href="${c.href}.json"><code>${c.$id}</code></a></dd></dl>
 ${c.deprecation ? html`<div class="notice warn">Deprecated since ${c.deprecation.since}; use ${c.deprecation.replacement}. Removed after ${c.deprecation.removeAfter}. ${c.deprecation.reason || ''}</div>` : ''}
 <p>${c.description}</p>
 <h2>Fields</h2>
@@ -216,7 +221,7 @@ ${table(['Field', 'Type', 'Required', 'Description', 'Constraints'], c.fields.ma
 <h2>Examples</h2>
 <p class="muted">From the contract's own test fixtures: valid ones validate, rejected ones must fail.</p>
 ${c.fixtures.valid.map((f) => fixture(f, true))}${c.fixtures.invalid.map((f) => fixture(f, false))}
-${!c.fixtures.valid.length && !c.fixtures.invalid.length ? html`<p class="muted">No fixtures ship with this contract.</p>` : ''}
+${!c.fixtures.valid.length && !c.fixtures.invalid.length ? html`<p class="muted">${c.latest ? 'No fixtures ship with this contract.' : 'The fixtures that ship with the package are the current major\'s.'}</p>` : ''}
 <h2>Validate</h2>
 <pre tabindex="0"><code>const contracts = require('openvibe-contracts');
 contracts.validate('${c.id}@${major}', value);   // { valid, errors: [{ path, message }] }</code></pre>`,
@@ -258,7 +263,7 @@ ${c.grantable ? html`<div class="notice ok">Grantable to apps: request it for an
 <dt>Status</dt><dd>${c.status}</dd><dt>Visibility</dt><dd>${c.visibility}</dd>
 <dt>Resource constraints</dt><dd>${c.resourceConstraints.join(', ') || 'none'}</dd><dt>Quota class</dt><dd>${c.quotaClass}</dd>
 <dt>Permissions</dt><dd>${c.permissions.join(', ') || '—'}</dd>
-${c.inputSchema ? html`<dt>Input</dt><dd>${docs.contract(c.inputSchema.split('@')[0]) ? html`<a href="/docs/contracts/${c.inputSchema.split('@')[0]}">${c.inputSchema}</a>` : c.inputSchema}</dd>` : ''}
+${c.inputSchema ? html`<dt>Input</dt><dd>${(() => { const [sid, sm] = c.inputSchema.split('@'); const s = docs.contract(sid, sm) || docs.contract(sid); return s ? html`<a href="${s.href}">${c.inputSchema}</a>` : c.inputSchema; })()}</dd>` : ''}
 ${c.outputSchema ? html`<dt>Output</dt><dd>${c.outputSchema}</dd>` : ''}
 <dt>Events</dt><dd>${c.events.length ? c.events.join(', ') : '—'}</dd>
 <dt>Implemented by</dt><dd>${(c.implementedBy || []).length ? html`<ul class="plain">${c.implementedBy.map((x) => html`<li><code>${x}</code></li>`)}</ul>` : '—'}</dd></dl>

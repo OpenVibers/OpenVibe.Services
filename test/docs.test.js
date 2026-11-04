@@ -56,17 +56,28 @@ const sdkPkg = require('openvibe-sdk/package.json');
 
     await check('one page per contract in the catalog, with its version, fields and fixtures', async () => {
         const index = (await t.get('/docs/contracts')).text;
+        // Every major of an id in the catalog has a page: the latest at /docs/contracts/<id>, an older one at <id>@<major>.
+        const majorOf = (c) => Number(c.version.split('.')[0]);
+        const latest = new Map();
+        for (const c of contracts.catalog) latest.set(c.id, Math.max(latest.get(c.id) || 0, majorOf(c)));
         for (const c of contracts.catalog) {
-            assert.ok(index.includes(`/docs/contracts/${c.id}"`), `${c.id} listed`);
-            const r = await t.get(`/docs/contracts/${c.id}`);
-            assert.strictEqual(r.status, 200, c.id);
-            assert.ok(r.text.includes(`<dd>${c.version}</dd>`), `${c.id} version`);
-            const schema = contracts.schema(c.id);
-            for (const field of Object.keys(schema.properties || {})) assert.ok(r.text.includes(`<code>${field}</code>`), `${c.id} field ${field}`);
+            const isLatest = majorOf(c) === latest.get(c.id);
+            const ref = isLatest ? c.id : `${c.id}@${majorOf(c)}`;
+            assert.ok(index.includes(`/docs/contracts/${ref}"`), `${ref} listed`);
+            const r = await t.get(`/docs/contracts/${ref}`);
+            assert.strictEqual(r.status, 200, ref);
+            assert.ok(r.text.includes(`<dd>${c.version}</dd>`), `${ref} version`);
+            const schema = contracts.schema(`${c.id}@${majorOf(c)}`);
+            for (const field of Object.keys(schema.properties || {})) assert.ok(r.text.includes(`<code>${field}</code>`), `${ref} field ${field}`);
             const fixtureDir = path.join(path.dirname(require.resolve('openvibe-contracts/package.json')), 'fixtures', c.id, 'valid');
-            for (const f of fs.existsSync(fixtureDir) ? fs.readdirSync(fixtureDir) : []) assert.ok(r.text.includes(f.replace(/\.json$/, '')), `${c.id} fixture ${f}`);
-            const raw = await t.get(`/docs/contracts/${c.id}.json`);
+            if (isLatest) for (const f of fs.existsSync(fixtureDir) ? fs.readdirSync(fixtureDir) : []) assert.ok(r.text.includes(f.replace(/\.json$/, '')), `${ref} fixture ${f}`);
+            const raw = await t.get(`/docs/contracts/${ref}.json`);
             assert.deepStrictEqual(JSON.parse(raw.text), schema);
+        }
+        const older = contracts.catalog.find((c) => majorOf(c) < latest.get(c.id));
+        if (older) {
+            const r = await t.get(`/docs/contracts/${older.id}@${majorOf(older)}`);
+            assert.ok(r.text.includes(`/docs/contracts/${older.id}"`), 'an older major links the current one');
         }
         assert.strictEqual((await t.get('/docs/contracts/no.such-contract')).status, 404);
         // The way the platform writes a contract, name@major, opens its page; another major does not.
