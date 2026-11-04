@@ -233,7 +233,7 @@ function createPlayground({ store, config, network, keys, fetchImpl, log = conso
             const choice = Array.isArray(doc.choices) && doc.choices[0] ? doc.choices[0] : {};
             const reply = String((choice.message && choice.message.content) || '').slice(0, 8000);
             const out = await finish({ outcome: 'ok', stage: 'done', http_status: res.status, detail: `answered by ${String(doc.model || aiBody.model).slice(0, 160)}`, ref: doc.id ? String(doc.id).slice(0, 120) : null });
-            return { ...out, result: { model: doc.model || aiBody.model, reply, finish_reason: choice.finish_reason || null, usage: doc.usage || null, openvibe: doc.x_openvibe || doc.openvibe || null } };
+            return { ...out, result: { model: doc.model || aiBody.model, reply, finish_reason: choice.finish_reason || null, usage: doc.usage || null, openvibe: doc.x_openvibe || null } };
         }
 
         const client = sdkClient(tok.token);
