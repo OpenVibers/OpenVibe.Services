@@ -260,6 +260,8 @@ async function createApp(opts = {}) {
     app.use('/projects', rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false, skip: (req) => req.method === 'GET' }), createPortalRoutes(ctx));
     app.use('/releases', createReleaseActionRoutes(ctx));
     app.use(createToolRoutes(ctx));
+    // The model explorer (AI Exchange P8, /models): behind SERVICES_MODEL_EXPLORER, off until the catalog is live.
+    app.use(require('./http/models').createModelRoutes(ctx));
     app.use(createPageRoutes(ctx));
     app.use((req, res) => send(res, 404, { viewer: req.viewer, config, path: req.originalUrl, title: 'Not found', body: html`<h1>Not found</h1><p>No page here. Try the <a href="/docs">docs</a> or <a href="/projects">your projects</a>.</p>` }));
 

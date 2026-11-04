@@ -51,7 +51,8 @@ function setRelease(id) { if (id) RELEASE = String(id); }
 
 /**
  * o: title, description, body (html), viewer, config, path, index (default false), scripts [rel],
- *    crumbs [{ label, href }], jsonLd [nodes] (serialised by openvibe-shared/seo), styles [openvibe-shared stylesheet names]
+ *    crumbs [{ label, href }], jsonLd [nodes] (serialised by openvibe-shared/seo), styles [openvibe-shared stylesheet names],
+ *    css [this site's own stylesheets for one page, e.g. 'css/models.css']
  */
 function renderPage(o) {
     const viewer = o.viewer || { kind: 'anonymous' };
@@ -99,6 +100,7 @@ function renderPage(o) {
         head: `<meta name="referrer" content="${o.noReferrer ? 'no-referrer' : 'strict-origin-when-cross-origin'}">
 ${appIcon.headTags({ site: 'services' })}
 <link rel="stylesheet" href="${asset('css/services.css')}">
+${(o.css || []).map((rel) => `<link rel="stylesheet" href="${esc(asset(rel))}">`).join('\n')}
 ${(o.styles || []).map((name) => `<link rel="stylesheet" href="${esc(ovServe.url(name))}">`).join('\n')}
 ${render(scripts)}
 <meta name="ov-boost" content="services@${esc(RELEASE)}">
