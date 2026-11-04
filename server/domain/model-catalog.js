@@ -13,7 +13,7 @@
  *   WORKLOADS, filterModels(models, query), sortModels(models, by, workload)
  *
  * Source: AI's catalog when SERVICES_MODEL_CATALOG_SOURCE=ai (cached a minute, a failure is said and the last
- * reading kept); otherwise the preview fixture (server/data/ai-models.preview.json), whose prices are examples and
+ * reading kept); otherwise the preview fixture (server/fixtures/ai-models.preview.json), whose prices are examples and
  * every page says so. The pages are behind SERVICES_MODEL_EXPLORER (off) until AI's catalog and Billing's
  * inference prices are live: no public price promise before the owner approves one.
  */
@@ -21,7 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const PREVIEW = path.join(__dirname, '..', 'data', 'ai-models.preview.json');
+const PREVIEW = path.join(__dirname, '..', 'fixtures', 'ai-models.preview.json');
 const NANO = 1_000_000_000n;
 const COMPONENTS = ['input', 'cached_read', 'cache_write', 'output'];
 const VARIANTS = {

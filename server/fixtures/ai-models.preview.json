@@ -1,0 +1,66 @@
+{
+  "note": "PREVIEW FIXTURE for the developer portal (AI Exchange P8). Shapes follow ai.model@1 (CHECKPOINT D4). Prices are EXAMPLES, not offers; revisions are 'preview' and sha256 is null until OpenVibe.AI publishes verified artifacts. Never shown publicly: the pages are behind SERVICES_MODEL_EXPLORER and say 'example prices'.",
+  "as_of": "2026-11-03",
+  "aliases": [
+    { "id": "openvibe/auto", "object": "model", "dynamic": true, "name": "Auto", "policy": "balanced", "description": "Picks among the models you allow, per request, and tells you which one answered and why.", "capabilities": ["tools", "json", "stream"] },
+    { "id": "openvibe/economy", "object": "model", "dynamic": true, "name": "Economy", "policy": "cheapest", "description": "The lowest cost per successful answer that still meets the quality floor.", "capabilities": ["json", "stream"] },
+    { "id": "openvibe/balanced", "object": "model", "dynamic": true, "name": "Balanced", "policy": "balanced", "description": "Cost, success rate and speed weighed together.", "capabilities": ["tools", "json", "stream"] },
+    { "id": "openvibe/fast", "object": "model", "dynamic": true, "name": "Fast", "policy": "fastest", "description": "The quickest first token under your cost cap.", "capabilities": ["json", "stream"] },
+    { "id": "openvibe/private", "object": "model", "dynamic": true, "name": "Private", "policy": "private", "description": "Never leaves OpenVibe-run machines or your own.", "capabilities": ["json", "stream"] }
+  ],
+  "models": [
+    {
+      "id": "qwen/qwen3-4b-abliterated:q4_k_m@preview", "object": "model", "name": "Qwen3 4B Abliterated", "org": "qwen", "family": "qwen3",
+      "variant": "abliterated", "base_model": "qwen/qwen3-4b", "modification": { "method": "abliteration", "note": "Refusal direction removed from the weights. Not a guarantee of quality or of no refusals." },
+      "quant": "q4_k_m", "revision": "preview", "sha256": null, "license": "apache-2.0",
+      "context_tokens": 32768, "max_output_tokens": 8192, "capabilities": ["tools", "json", "stream"], "modalities": { "input": ["text"], "output": ["text"] },
+      "retail": { "version": "example-1", "nano_usd_per_m": { "input": "20000000", "cached_read": "5000000", "cache_write": "20000000", "output": "60000000" }, "per_request_nano_usd": "0" },
+      "access": ["OWN_DEPLOYMENT"], "availability": "planned", "hardware": "One 8-12 GB GPU", "quality": { "bench_url": null, "score": null, "samples": 0 }
+    },
+    {
+      "id": "qwen/qwen3-4b:q4_k_m@preview", "object": "model", "name": "Qwen3 4B", "org": "qwen", "family": "qwen3",
+      "variant": "original", "base_model": null, "quant": "q4_k_m", "revision": "preview", "sha256": null, "license": "apache-2.0",
+      "context_tokens": 32768, "max_output_tokens": 8192, "capabilities": ["tools", "json", "stream"], "modalities": { "input": ["text"], "output": ["text"] },
+      "retail": { "version": "example-1", "nano_usd_per_m": { "input": "20000000", "cached_read": "5000000", "cache_write": "20000000", "output": "60000000" }, "per_request_nano_usd": "0" },
+      "access": ["OWN_DEPLOYMENT"], "availability": "planned", "hardware": "One 8-12 GB GPU", "quality": { "bench_url": null, "score": null, "samples": 0 }
+    },
+    {
+      "id": "qwen/qwen3-8b-abliterated:q4_k_m@preview", "object": "model", "name": "Qwen3 8B Abliterated", "org": "qwen", "family": "qwen3",
+      "variant": "abliterated", "base_model": "qwen/qwen3-8b", "modification": { "method": "abliteration", "note": "Refusal direction removed from the weights. Benchmarked separately from the original." },
+      "quant": "q4_k_m", "revision": "preview", "sha256": null, "license": "apache-2.0",
+      "context_tokens": 32768, "max_output_tokens": 8192, "capabilities": ["tools", "json", "stream"], "modalities": { "input": ["text"], "output": ["text"] },
+      "retail": { "version": "example-1", "nano_usd_per_m": { "input": "40000000", "cached_read": "10000000", "cache_write": "40000000", "output": "120000000" }, "per_request_nano_usd": "0" },
+      "access": ["OWN_DEPLOYMENT"], "availability": "planned", "hardware": "One 12-16 GB GPU", "quality": { "bench_url": null, "score": null, "samples": 0 }
+    },
+    {
+      "id": "google/gemma-3-27b-abliterated:q4_k_m@preview", "object": "model", "name": "Gemma 3 27B Abliterated", "org": "google", "family": "gemma3",
+      "variant": "abliterated", "base_model": "google/gemma-3-27b-it", "modification": { "method": "abliteration", "note": "Community abliteration of the instruction-tuned model; Gemma terms apply." },
+      "quant": "q4_k_m", "revision": "preview", "sha256": null, "license": "gemma",
+      "context_tokens": 32768, "max_output_tokens": 8192, "capabilities": ["json", "vision", "stream"], "modalities": { "input": ["text", "image"], "output": ["text"] },
+      "retail": { "version": "example-1", "nano_usd_per_m": { "input": "90000000", "cached_read": "25000000", "cache_write": "90000000", "output": "250000000" }, "per_request_nano_usd": "0" },
+      "access": ["OWN_DEPLOYMENT"], "availability": "planned", "hardware": "One 24 GB GPU", "quality": { "bench_url": null, "score": null, "samples": 0 }
+    },
+    {
+      "id": "deepseek/deepseek-v3.2@preview", "object": "model", "name": "DeepSeek V3.2", "org": "deepseek", "family": "deepseek-v3",
+      "variant": "original", "base_model": null, "quant": "fp8", "revision": "preview", "sha256": null, "license": "mit",
+      "context_tokens": 131072, "max_output_tokens": 8192, "capabilities": ["tools", "json", "stream"], "modalities": { "input": ["text"], "output": ["text"] },
+      "retail": { "version": "example-1", "nano_usd_per_m": { "input": "300000000", "cached_read": "30000000", "cache_write": "300000000", "output": "450000000" }, "per_request_nano_usd": "0" },
+      "access": ["CUSTOMER_BYOK", "UNVERIFIED"], "availability": "byok_only", "hardware": "Large MoE: through a partner", "quality": { "bench_url": null, "score": null, "samples": 0 }
+    },
+    {
+      "id": "zai/glm-4.6@preview", "object": "model", "name": "GLM 4.6", "org": "zai", "family": "glm",
+      "variant": "original", "base_model": null, "quant": "fp8", "revision": "preview", "sha256": null, "license": "mit",
+      "context_tokens": 131072, "max_output_tokens": 16384, "capabilities": ["tools", "json", "stream"], "modalities": { "input": ["text"], "output": ["text"] },
+      "retail": { "version": "example-1", "nano_usd_per_m": { "input": "450000000", "cached_read": "110000000", "cache_write": "450000000", "output": "1600000000" }, "per_request_nano_usd": "0" },
+      "access": ["CUSTOMER_BYOK", "UNVERIFIED"], "availability": "pending_agreement", "hardware": "Large MoE: through a partner", "quality": { "bench_url": null, "score": null, "samples": 0 }
+    },
+    {
+      "id": "mistral/devstral-small-2505:q4_k_m@preview", "object": "model", "name": "Devstral Small", "org": "mistral", "family": "devstral",
+      "variant": "finetuned", "base_model": "mistral/mistral-small-3.1", "modification": { "method": "fine-tune", "note": "Tuned by Mistral for coding agents." },
+      "quant": "q4_k_m", "revision": "preview", "sha256": null, "license": "apache-2.0",
+      "context_tokens": 131072, "max_output_tokens": 8192, "capabilities": ["tools", "json", "stream"], "modalities": { "input": ["text"], "output": ["text"] },
+      "retail": { "version": "example-1", "nano_usd_per_m": { "input": "70000000", "cached_read": "20000000", "cache_write": "70000000", "output": "200000000" }, "per_request_nano_usd": "0" },
+      "access": ["OWN_DEPLOYMENT", "CUSTOMER_BYOK"], "availability": "planned", "hardware": "One 24 GB GPU", "quality": { "bench_url": null, "score": null, "samples": 0 }
+    }
+  ]
+}
