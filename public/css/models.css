@@ -174,3 +174,16 @@
 .mx-jump a { color: var(--mx-soft); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--mx-accent) 40%, transparent); }
 .mx-steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; line-height: 1.55; }
 .mx-list { margin: 0; padding-left: 18px; display: grid; gap: 10px; line-height: 1.55; }
+/* A project's Credits */
+.cr-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.cr-tile { display: grid; gap: 4px; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--mx-line); background: var(--mx-card); }
+.cr-tile span { color: var(--mx-soft); font-size: 13px; font-weight: 650; }
+.cr-tile b { font-size: clamp(1.3rem, 3vw, 1.8rem); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cr-tile small { color: var(--mx-muted); font-size: 12.5px; }
+.cr-total { color: var(--mx-soft); font-weight: 600; font-size: .85em; margin-left: 8px; }
+.cr-chart { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); align-items: end; gap: 3px; height: 140px; padding: 8px 0; border-bottom: 1px solid var(--mx-line); }
+.cr-bar { display: flex; align-items: flex-end; height: 100%; }
+.cr-bar > span { display: block; width: 100%; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--mx-accent) 75%, transparent); }
+.cr-topup { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 0; }
+.cr-topup .mx-apply:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 720px) { .cr-tiles { grid-template-columns: minmax(0, 1fr); } .cr-chart { gap: 2px; height: 110px; } }

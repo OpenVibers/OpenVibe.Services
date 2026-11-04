@@ -941,6 +941,45 @@ ${r.result && r.kind === 'ai' ? aiResult(r.result) : r.result ? html`<pre tabind
 
     const statusFor = (out) => (out.outcome === 'ok' ? 200 : (out.stage === 'grant' || out.stage === 'app' ? 403 : (out.stage === 'input' ? 422 : (out.stage === 'rate' ? 429 : (out.stage === 'token' ? (out.http_status && out.http_status >= 400 ? out.http_status : 401) : 502)))));
 
+    // ── Credits (AI Exchange D9): the project's prepaid balance and what it was spent on; Billing is the authority ──
+    const creditsReader = ctx.creditsReader || require('../domain/credits').createCreditsReader({});
+    r.get('/:project/credits', idParams, async (req, res, next) => {
+        if (process.env.SERVICES_MODEL_EXPLORER !== '1') return next();
+        const project = await net(req, res, (t) => network.projects.get(t, req.params.project));
+        if (!project.ok) return problemPage(req, res, project.problem, { back: '/projects' });
+        const { usd } = require('../domain/model-catalog');
+        const { daily } = require('../domain/credits');
+        let st = null; let problem = null;
+        try { st = await sso.asViewer(req, res, (t) => creditsReader.statement(t, req.params.project)); } catch (e) {
+            problem = { status: e.status || 502, code: e.code || 'services.billing_unavailable', detail: e.status === 404 ? 'Credits are not open yet.' : String(e.message || 'Billing did not answer').slice(0, 200) };
+        }
+        const base = `/projects/${req.params.project}`;
+        const tile = (label, nano, note) => html`<div class="cr-tile"><span>${label}</span><b>${usd(nano)}</b>${note ? html`<small>${note}</small>` : ''}</div>`;
+        let bodyMain;
+        if (!st) {
+            bodyMain = html`<div class="mx-note${problem && problem.status === 404 ? '' : ' is-bad'}" role="status">${problem.detail}</div>`;
+        } else {
+            const days = daily(st.charges, 30);
+            const max = days.reduce((m, d) => (d.nano > m ? d.nano : m), 1n);
+            const total = days.reduce((m, d) => m + d.nano, 0n);
+            const n = (x) => Number(x || 0).toLocaleString('en-US');
+            bodyMain = html`<div class="cr-tiles">${tile('Balance', st.balance_nano_usd)}${tile('Held now', st.held_nano_usd, 'by requests still running')}${tile('Available', st.available_nano_usd)}</div>
+<section class="mx-card"><h2>Spent in the last 30 days <small class="cr-total">${usd(total)}</small></h2>
+<div class="cr-chart" role="img" aria-label="${`Spend per day for 30 days, ${usd(total)} in all`}">${days.map((d) => html`<span class="cr-bar" title="${`${d.day}: ${usd(d.nano)}`}"><span style="height:${d.nano === 0n ? 0 : Math.max(3, Number((d.nano * 100n) / max))}%"></span></span>`)}</div>
+<p class="mx-hint">${days[0].day} to ${days[days.length - 1].day}, UTC.</p></section>
+<section class="mx-card"><h2>Recent requests</h2>
+${st.charges.length ? html`<div class="mx-table-wrap"><table class="mx-table"><thead><tr><th scope="col">When</th><th scope="col">Model</th><th scope="col" class="mx-num">Tokens in · cached · out</th><th scope="col" class="mx-num">Charge</th></tr></thead><tbody>
+${st.charges.map((c) => { const u = c.usage || {}; return html`<tr><td data-label="When">${String(c.at || '').replace('T', ' ').slice(0, 16)} UTC</td><td data-label="Model"><code class="mx-id">${c.model || c.service}</code>${c.byok ? html` <span class="mx-badge is-new">Your key</span>` : ''}${c.shortfall_nano_usd && c.shortfall_nano_usd !== '0' ? html` <span class="mx-badge is-warn">Short ${usd(c.shortfall_nano_usd)}</span>` : ''}</td><td class="mx-num" data-label="Tokens">${n(u.input_tokens)} · ${n(u.cached_read_tokens)} · ${n(u.output_tokens)}</td><td class="mx-num mx-strong" data-label="Charge">${usd(c.charge_nano_usd)}</td></tr>`; })}
+</tbody></table></div>` : html`<p class="mx-empty">No requests yet. <a href="/docs/ai#start">Make the first one</a>.</p>`}</section>`;
+        }
+        page(req, res, {
+            title: `Credits · ${project.data.name}`, css: ['css/models.css'], scripts: ['js/models.js'],
+            crumbs: [{ label: 'Projects', href: '/projects' }, { label: project.data.name, href: base }, { label: 'Credits' }],
+            body: html`<div class="mx"><header class="mx-hero is-small"><p class="mx-eye">Credits</p><h1>${project.data.name}</h1><p class="mx-lede">The prepaid balance this project's AI requests spend, exact to the nano-dollar. Each request holds at most its cap, then is charged only what it used.</p>
+<p class="cr-topup"><button type="button" class="mx-apply" disabled>Add credits</button> <span class="mx-hint">Top-ups open when Credits launch.</span></p></header>${bodyMain}</div>`,
+        });
+    });
+
     r.get('/:project/apps/:app/playground', idParams, async (req, res) => await playgroundPage(req, res));
 
     r.post('/:project/apps/:app/playground/events', idParams, B('services.playground.run'), form, guard, async (req, res) => {
