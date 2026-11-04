@@ -174,7 +174,7 @@
 .mx-jump a { color: var(--mx-soft); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--mx-accent) 40%, transparent); }
 .mx-steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; line-height: 1.55; }
 .mx-list { margin: 0; padding-left: 18px; display: grid; gap: 10px; line-height: 1.55; }
-/* A project's Credits */
+/* A project's Balance */
 .cr-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .cr-tile { display: grid; gap: 4px; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--mx-line); background: var(--mx-card); }
 .cr-tile span { color: var(--mx-soft); font-size: 13px; font-weight: 650; }

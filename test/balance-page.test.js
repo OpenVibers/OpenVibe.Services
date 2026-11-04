@@ -1,19 +1,19 @@
 'use strict';
 /**
- * A project's Credits page (AI Exchange D9): the balance, held and available from OpenVibe Billing's /api/me/credits
- * with the person's own token, spend per day, recent requests with exact charges; "not open yet" when Billing's ledger
- * is off; nothing without the explorer's flag.
+ * A project's Balance page (D12, the D9 page renamed): the balance, held and available from Billing's project
+ * statement with the person's own token, spend per day, recent requests with exact charges; "not open yet" when
+ * Billing's ledger is off; the old /credits address redirects; nothing without the explorer's flag.
  */
 const assert = require('assert');
 const http = require('http');
-const { daily } = require('../server/domain/credits');
+const { daily } = require('../server/domain/balance');
 
 (async () => {
     const asked = [];
     let mode = 'open';
     const billing = http.createServer((req, res) => {
         asked.push({ url: req.url, auth: req.headers.authorization || '' });
-        if (mode === 'off') { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ code: 'billing.not_enabled', detail: 'Credits are not open yet' })); }
+        if (mode === 'off') { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ code: 'billing.not_enabled', detail: 'Balance is not open yet' })); }
         const today = new Date().toISOString();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -44,21 +44,22 @@ const { daily } = require('../server/domain/credits');
     try {
         await check('off by default', async () => {
             delete process.env.SERVICES_MODEL_EXPLORER;
-            assert.strictEqual((await t.get(`/projects/${projectId}/credits`, { as: owner })).status, 404);
+            assert.strictEqual((await t.get(`/projects/${projectId}/balance`, { as: owner })).status, 404);
         });
         process.env.SERVICES_MODEL_EXPLORER = '1';
         await check('the page: balance, held, available, the requests, with the person\'s own token', async () => {
-            const r = await t.get(`/projects/${projectId}/credits`, { as: owner });
+            const r = await t.get(`/projects/${projectId}/balance`, { as: owner });
             assert.strictEqual(r.status, 200, r.text.slice(0, 300));
-            assert.match(asked.at(-1).url, new RegExp(`^/api/me/credits\\?project_id=${projectId}$`));
+            assert.match(asked.at(-1).url, new RegExp(`^/api/me/credits\\?project_id=${projectId}$`), 'Billing\'s project statement (the D12 wire alias)');
             assert.match(asked.at(-1).auth, /^Bearer ey/, 'the person\'s own token');
             assert.match(r.text, /<span>Balance<\/span><b>\$0\.00499<\/b>/);
-            assert.match(r.text, /class="cr-sandbox"><span class="mx-badge">Sandbox<\/span> <span><b>\$0\.001<\/b> of test credit/, 'sandbox credit is shown apart, never in the balance');
+            assert.match(r.text, /class="cr-sandbox"><span class="mx-badge">Sandbox<\/span> <span><b>\$0\.001<\/b> of test Balance/, 'sandbox Balance is shown apart, never in the balance');
             assert.match(r.text, /<span>Held now<\/span><b>\$0\.00002<\/b>/);
             assert.match(r.text, /<code class="mx-id">qwen\/qwen3-4b:q4_k_m@3f2a1c9<\/code>/);
             assert.match(r.text, /\$0\.000000104/);
             assert.match(r.text, /Your key/, 'a BYOK request says so');
-            assert.match(r.text, /Top-ups open when Credits launch/);
+            assert.match(r.text, /Adding money opens when Balance launches/);
+            assert.ok(!/Credits/i.test(r.text), 'the public word is Balance');
         });
         await check('start with AI: each step read live, the next one marked, its action offered', async () => {
             const page = async () => (await t.get(`/projects/${projectId}/ai`, { as: owner })).text;
@@ -72,14 +73,20 @@ const { daily } = require('../server/domain/credits');
             await t.grant(owner, projectId, app.id, 'ai.app.run');
             h = await page();
             assert.match(h, new RegExp(`href="/projects/${projectId}/apps/${app.id}/playground#ai"`), 'then: the playground');
-            assert.match(h, /Balance <b>\$0\.00499<\/b>/, 'and the Credits, read from Billing');
+            assert.match(h, /Balance <b>\$0\.00499<\/b>/, 'and the Balance, read from Billing');
+            assert.match(h, new RegExp(`href="/projects/${projectId}/balance"`), 'the step links to the Balance page, not the old address');
         });
 
         await check('Billing\'s ledger off: "not open yet", not an error page', async () => {
             mode = 'off';
-            const r = await t.get(`/projects/${projectId}/credits`, { as: owner });
+            const r = await t.get(`/projects/${projectId}/balance`, { as: owner });
             assert.strictEqual(r.status, 200);
-            assert.match(r.text, /Credits are not open yet\./);
+            assert.match(r.text, /Balance is not open yet\./);
+        });
+        await check('the old /credits address redirects to /balance', async () => {
+            const r = await t.get(`/projects/${projectId}/credits`, { as: owner });
+            assert.strictEqual(r.status, 301);
+            assert.strictEqual(r.headers.get('location'), `/projects/${projectId}/balance`);
         });
     } finally {
         delete process.env.SERVICES_MODEL_EXPLORER;

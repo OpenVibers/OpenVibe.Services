@@ -263,6 +263,7 @@ async function createApp(opts = {}) {
     // The model explorer (AI Exchange P8, /models): behind SERVICES_MODEL_EXPLORER, off until the catalog is live.
     app.use(require('./http/models').createModelRoutes(ctx));
     app.use(require('./http/ai-docs').createAiDocsRoutes(ctx));
+    app.use(require('./http/money-docs').createMoneyDocsRoutes(ctx));
     app.use(createPageRoutes(ctx));
     app.use((req, res) => send(res, 404, { viewer: req.viewer, config, path: req.originalUrl, title: 'Not found', body: html`<h1>Not found</h1><p>No page here. Try the <a href="/docs">docs</a> or <a href="/projects">your projects</a>.</p>` }));
 

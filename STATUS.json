@@ -46,6 +46,7 @@
     "per-actor limits (openvibe-sdk/limits)",
     "Services' own manifests and releases (services.manifest, services.release) in the merged index, read in process, with OVRN reads",
     "crawl artifacts (robots.txt, sitemap.xml, llms.txt, llms-full.txt) and the home page's JSON-LD",
+    "the D12 money guides (/docs/vibes and /docs/balance) and a project's Balance page (the D9 page renamed, /credits 301s to /balance)",
     "the authority registry (server/authorities/index.js): built at boot from the pinned openvibe-contracts service manifests — every non-placeholder service whose manifest lists an active <id>.resource.read is an authority (at v0.110.0: network, events, host, codes, media), with its manifest internalOrigin (SERVICES_<ID>_URL overrides) and audience openvibe.<id>; Services itself is never an authority",
     "one adapter per authority (server/authorities/adapter.js): GET /api/v1/resources and GET /api/v1/resources/:ovrn over that authority's loopback origin with a Network client-credentials token for its audience, scoped to its resource.read capability and cached (one mint per authority, refreshed 60 s before expiry; server/authorities/tokens.js)",
     "the merged resource index (server/resources.js, GET /api/v1/resources?project=&kind=&service=&cursor=&limit=): openvibe-sdk/resources' createResourceIndex fans out and merges every authority's pages (per-authority cursor walk, concurrency 4, per-authority timeout), Services adds a deterministic (service, ovrn, id) total order and an opaque keyset cursor, and filters project/kind/service locally so a scoped read never shows a row outside its scope",
@@ -64,5 +65,5 @@
     "Governance material (code of conduct, contribution guide, contributor ladder, moderation policy) is written as drafts pending owner review: not in effect, not indexed",
     "plan T13 step 4 done in OpenVibe.Contracts v0.110.0 (services.resource.read is registered, active and first-party), step 5 done in Network, step 7 (read model + ingestion), steps 9-15 (console, control operations, recipes, usage, deploy)"
   ],
-  "updated": "2026-11-03"
+  "updated": "2026-11-04"
 }

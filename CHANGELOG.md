@@ -4,6 +4,14 @@ Notable changes to OpenVibe.Services. The service is unreleased; everything belo
 
 ## Unreleased
 
+- **Money words (D12): Balance, Vibes and Vibes Pay.** The project page from D9 is now the
+  project's **Balance** at `/projects/:project/balance` (the old `/credits` address 301s to it), with **Add money**,
+  a sandbox Balance shown apart, and the old public word gone from every page. New developer guides: `/docs/vibes` (what Vibes are;
+  Vibes Pay step by step with `openvibe-sdk/vibes` and plain HTTP; the `X-OpenVibe-Signature-V2` webhook and its
+  ±300 s window; sandbox, refunds, payouts, `billing.vibes` limits) and `/docs/balance` (how metered usage holds and
+  settles against a project's Balance, adding money, moving money to a project with `/api/me/balance/transfers`).
+  The AI guide says Balance, and the docs index links both guides. `server/http/money-docs.js`,
+  `server/domain/balance.js`, `test/balance-page.test.js`, `test/money-docs.test.js`.
 - **Mod the network** (`/mod`, `server/http/mod.js`; the owner 2026-10-25: "openvibe.services as the place to mod the network or build your own sites with the SDK and APIs"). Every way to extend OpenVibe today, each with its link: your own site with the shared home-page kit, chat bots, alerts and work into a team room (Chat room hooks), watches that act, agents, Bot drivers and screen shares, game worlds, events, and changing OpenVibe itself on Codes. Packaged mods say plainly that staff install them until ADR-013's signing and review decisions are made. In the navigation, the sitemap, llms.txt and the home's quick start. `test/mod-page.test.js`.
 - Control operations (ADR-048, plan T13 step 10): `POST /api/v1/resources/control` behind `services.resource.control` (contracts v0.154.0, was v0.150.0).
   - It takes a `common.resource-control-request@1` and answers the owning authority's `common.resource-control-result@1`. The request is forwarded through `openvibe-sdk/resources` `createResourceClient`.
