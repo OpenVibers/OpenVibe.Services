@@ -37,7 +37,9 @@ const http = require('http');
         assert.match(aiInput({ model: 'openvibe', prompt: 'x'.repeat(4001) }).error, /4,000/);
     });
 
-    const t = await boot();
+    // AI Exchange D10: openvibe.ai accepts sandbox app tokens (Network's DEV_SANDBOX_AUDIENCES at launch; AI spends only
+    // sandbox credit on them). The Network mock is started with it.
+    const t = await boot({ network: { sandboxAudiences: ['openvibe.events', 'openvibe.media', 'openvibe.ai'] } });
     // The test boot builds its config from a fixed environment: the AI playground's switch and endpoint are set on it.
     t.config.playground.ai = true;
     t.config.playground.aiUrl = process.env.SERVICES_PLAYGROUND_AI_URL;
@@ -66,12 +68,9 @@ const http = require('http');
         }
         if (hasD8) {
         await check('with the grant: the app token goes to OpenVibe AI; the reply and what answered are shown', async () => {
-            // ai.inference.create is new in Contracts (AI Exchange D8) and not in the pinned catalog yet, so the grant is
-            // set in the Network mock's state as Network will hold it: approved, for audience openvibe.ai.
-            t.network.setAllowance(projectId, [...new Set([...t.network.state.projects.get(projectId).allowance, 'ai.inference.create'])]);
-            t.network.state.grants.set(`${app.id} ai.inference.create`, { app_id: app.id, capability: 'ai.inference.create', audience: 'openvibe.ai', status: 'approved', requested_by: `user:${owner.subject}`, requested_at: new Date().toISOString() });
+            await t.grant(owner, projectId, app.id, 'ai.inference.create');   // through Services' own grant flow (D8, Contracts v0.284.0)
             const r = await ask({ credential_type: 'client_secret', credential: app.secret });
-            assert.strictEqual(r.status, 200, t.logs().split('\n').slice(-6).join('\n'));
+            assert.strictEqual(r.status, 200, String((r.text.match(/<div class="result[^>]*>[\s\S]{0,400}/) || [r.status])[0]));
             assert.strictEqual(asked.length, 1);
             assert.strictEqual(asked[0].path, '/v1/chat/completions');
             assert.match(asked[0].auth, /^Bearer ey/, 'the app\'s own token, never a secret of Services');
@@ -89,7 +88,7 @@ const http = require('http');
             assert.match(log, /answered by qwen\/qwen3-4b:q4_k_m@3f2a1c9/);
             assert.ok(!log.includes('Say hello in five words'), 'no prompt in the log');
             assert.ok(!log.includes('Hello from a tiny model'), 'no reply in the log');
-            const dump = await t.dump();
+            const dump = await t.dbDump();
             assert.ok(!dump.includes('Say hello in five words') && !dump.includes('Hello from a tiny model'), 'nor anywhere in the database');
         });
         }
