@@ -187,3 +187,19 @@
 .cr-topup { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 0; }
 .cr-topup .mx-apply:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 720px) { .cr-tiles { grid-template-columns: minmax(0, 1fr); } .cr-chart { gap: 2px; height: 110px; } }
+/* Start with OpenVibe AI (/projects/:id/ai) */
+.ob-bar { height: 8px; max-width: 420px; border-radius: 99px; background: color-mix(in srgb, var(--text-primary, #fff) 8%, transparent); overflow: hidden; }
+.ob-bar > span { display: block; height: 100%; border-radius: 99px; background: var(--mx-accent); }
+.ob-steps { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.ob-step { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; align-items: start; }
+.ob-step.is-next { border-color: var(--mx-accent); box-shadow: 0 0 0 1px var(--mx-accent); }
+.ob-n { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--text-primary, #fff) 8%, transparent); color: var(--mx-soft); font-weight: 750; }
+.ob-step.is-done .ob-n { background: color-mix(in srgb, var(--mx-ok) 18%, transparent); color: var(--mx-ok); }
+.ob-step.is-next .ob-n { background: var(--mx-accent); color: var(--on-accent, #fff); }
+.ob-body h2 { margin: 0 0 4px; font-size: 1.05rem; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ob-body p { margin: 0; color: var(--mx-soft); line-height: 1.55; }
+.ob-action { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+.ob-action form { margin: 0; }
+.ob-action .mx-copy { display: inline-flex; align-items: center; text-decoration: none; min-height: 40px; }
+@media (max-width: 640px) { .ob-step { grid-template-columns: 32px minmax(0, 1fr); gap: 10px; } .ob-n { width: 32px; height: 32px; } }
+a.mx-apply { display: inline-flex; align-items: center; text-decoration: none; }

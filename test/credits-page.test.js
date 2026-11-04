@@ -58,6 +58,21 @@ const { daily } = require('../server/domain/credits');
             assert.match(r.text, /Your key/, 'a BYOK request says so');
             assert.match(r.text, /Top-ups open when Credits launch/);
         });
+        await check('start with AI: each step read live, the next one marked, its action offered', async () => {
+            const page = async () => (await t.get(`/projects/${projectId}/ai`, { as: owner })).text;
+            let h = await page();
+            assert.match(h, /0 of 5 done|1 of 5 done/);
+            assert.match(h, /class="mx-card ob-step is-next"><span class="ob-n" aria-hidden="true">1<\/span>/, 'first: a sandbox app');
+            const app = await t.app(owner, projectId);
+            h = await page();
+            assert.match(h, /<span class="ob-n" aria-hidden="true">2<\/span>[\s\S]*?Next/, 'then: the permission');
+            assert.match(h, new RegExp(`action="/projects/${projectId}/apps/${app.id}/grants"`), 'with the button that asks for it');
+            await t.grant(owner, projectId, app.id, 'ai.inference.create');
+            h = await page();
+            assert.match(h, new RegExp(`href="/projects/${projectId}/apps/${app.id}/playground#ai"`), 'then: the playground');
+            assert.match(h, /Balance <b>\$0\.00499<\/b>/, 'and the Credits, read from Billing');
+        });
+
         await check('Billing\'s ledger off: "not open yet", not an error page', async () => {
             mode = 'off';
             const r = await t.get(`/projects/${projectId}/credits`, { as: owner });

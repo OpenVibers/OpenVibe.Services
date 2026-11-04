@@ -980,6 +980,44 @@ ${st.charges.map((c) => { const u = c.usage || {}; return html`<tr><td data-labe
         });
     });
 
+    // ── Start with OpenVibe AI (AI Exchange P8): the steps to a first call, each read live, nothing stored ──
+    r.get('/:project/ai', idParams, async (req, res, next) => {
+        if (process.env.SERVICES_MODEL_EXPLORER !== '1') return next();
+        const project = await loadProject(req, res);
+        if (!project) return;
+        const base = `/projects/${project.id}`;
+        const got = await net(req, res, (t) => network.projects.apps(t, project.id));
+        const list = got.ok ? (Array.isArray(got.data) ? got.data : (got.data && got.data.apps) || []) : [];
+        const sandbox = list.filter((a) => a.environment === 'sandbox' && !a.revoked_at);
+        const app = sandbox.find((a) => (a.grants || []).includes('ai.inference.create')) || sandbox[0] || null;
+        const granted = !!(app && (app.grants || []).includes('ai.inference.create'));
+        const runs = app ? await playground.runsFor(app.id).catch(() => []) : [];
+        const called = runs.some((x) => x.kind === 'ai' && x.outcome === 'ok');
+        let credits = null;
+        try { credits = await sso.asViewer(req, res, (t) => creditsReader.statement(t, project.id)); } catch { credits = null; }
+        const { usd } = require('../domain/model-catalog');
+        const funded = !!(credits && credits.balance_nano_usd && credits.balance_nano_usd !== '0');
+        const c = csrf(req);
+        const steps = [
+            { done: !!app, title: 'A sandbox app', text: app ? html`<b>${app.name}</b> runs in the sandbox: it can try everything and spend nothing real.` : html`An app is what calls the API. Make a sandbox one first; production comes when you are ready.`, action: app ? '' : html`<a class="mx-apply" href="${base}#apps">Make a sandbox app</a>` },
+            { done: granted, title: 'Permission to call AI', text: html`The app needs <code>ai.inference.create</code>. Sandbox apps get it at once.`, action: app && !granted ? html`<form method="post" action="${base}/apps/${app.id}/grants">${csrfField(c)}<input type="hidden" name="capability" value="ai.inference.create"><button class="mx-apply" type="submit">Ask for it</button></form>` : '' },
+            { done: !!app, title: 'Its key', text: html`The app's secret was shown once when it was made; OpenVibe keeps only its hash. Lost it? Rotate it on the app's page.`, action: app ? html`<a class="mx-copy" href="${base}/apps/${app.id}">The app's page</a>` : '' },
+            { done: called, title: 'A first call', text: html`Ask anything in the playground, as the app: you see the answer, the model that gave it, and what it cost.`, action: app && granted ? html`<a class="mx-apply" href="${base}/apps/${app.id}/playground#ai">Open the playground</a>` : '' },
+            { done: funded, title: 'Credits', text: credits ? html`Balance <b>${usd(credits.balance_nano_usd)}</b>. Paid models spend Credits; your own keys and the sandbox never do.` : html`Credits are not open yet: the sandbox and your own keys work without them.`, action: html`<a class="mx-copy" href="${base}/credits">See Credits</a>` },
+        ];
+        const nextStep = steps.findIndex((x) => !x.done);
+        const done = steps.filter((x) => x.done).length;
+        page(req, res, {
+            title: `Start with AI · ${project.name}`, css: ['css/models.css'], scripts: ['js/models.js'],
+            crumbs: [{ label: 'Projects', href: '/projects' }, { label: project.name, href: base }, { label: 'AI' }],
+            body: html`<div class="mx"><header class="mx-hero is-small"><p class="mx-eye">Start with OpenVibe AI</p><h1>From nothing to a first answer</h1>
+<p class="mx-lede">${done} of ${steps.length} done. Each step checks itself; come back any time.</p>
+<div class="ob-bar" role="progressbar" aria-label="Steps done" aria-valuemin="0" aria-valuemax="${steps.length}" aria-valuenow="${done}"><span style="width:${Math.round((done / steps.length) * 100)}%"></span></div></header>
+<ol class="ob-steps">${steps.map((x, i) => html`<li class="mx-card ob-step${x.done ? ' is-done' : ''}${i === nextStep ? ' is-next' : ''}"><span class="ob-n" aria-hidden="true">${x.done ? '✓' : i + 1}</span><div class="ob-body"><h2>${x.title}${x.done ? html` <span class="mx-badge is-ok">Done</span>` : i === nextStep ? html` <span class="mx-badge is-new">Next</span>` : ''}</h2><p>${x.text}</p>${x.action ? html`<div class="ob-action">${x.action}</div>` : ''}</div></li>`)}</ol>
+<section class="mx-card"><h2>Then, from your code</h2><p>The base URL is <code>https://ai.openvibe.services/v1</code> for the OpenAI SDK. <a href="/docs/ai">The guide</a> has every SDK, the model names and the prices; <a href="/models">the models</a> are all here.</p></section></div>`,
+        });
+    });
+
     r.get('/:project/apps/:app/playground', idParams, async (req, res) => await playgroundPage(req, res));
 
     r.post('/:project/apps/:app/playground/events', idParams, B('services.playground.run'), form, guard, async (req, res) => {
