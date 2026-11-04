@@ -911,7 +911,7 @@ ${credFields}<button type="submit">Publish test event</button></form>` : ''}
 ${pre(media)}${media.ok ? html`<form method="post" action="${base}/playground/media" enctype="multipart/form-data" class="stack">${csrfField(c)}
 <label>File <input type="file" name="file" required></label>${credFields}<button type="submit">Upload</button></form>` : ''}
 ${ai ? html`<h2>${playground.KINDS.ai.label}</h2>
-<p class="muted small">Needs <code>ai.inference.create</code> (audience <code>openvibe.ai</code>). One reply, not streamed. The prompt and the answer are shown here once and never stored; the run log keeps the outcome only. Endpoint: <code>${config.playground.aiUrl}/v1/chat/completions</code>.</p>
+<p class="muted small">Needs <code>ai.app.run</code> (audience <code>openvibe.ai</code>). One reply, not streamed. The prompt and the answer are shown here once and never stored; the run log keeps the outcome only. Endpoint: <code>${config.playground.aiUrl}/v1/chat/completions</code>.</p>
 ${pre(ai)}${ai.ok ? html`<form method="post" action="${base}/playground/ai" class="stack">${csrfField(c)}
 <label>Model <select name="model" data-ov-title="Model">${aiModels.map((m) => html`<option value="${m.id}"${values.model === m.id ? raw(' selected') : ''}${m.variant ? raw(` data-desc="${m.variant}"`) : ''}>${m.name}</option>`)}</select></label>
 <label>Prompt <textarea name="prompt" rows="4" maxlength="4000" required>${values.prompt || 'Say hello in five words.'}</textarea></label>
@@ -930,7 +930,7 @@ ${table(['When', 'Playground', 'Credential', 'Outcome', 'Stage', 'HTTP', 'Code',
 ${r.result && r.kind === 'ai' ? aiResult(r.result) : r.result ? html`<pre tabindex="0"><code>${JSON.stringify(r.result, null, 2)}</code></pre>` : ''}</div>`;
     }
 
-    /** An AI reply: the answer, which model really answered and why (the openvibe disclosure), and the tokens. */
+    /** An AI reply: the answer, which model really answered and why (the x_openvibe disclosure), and the tokens. */
     function aiResult(x) {
         const o = x.openvibe || {};
         const u = x.usage || {};
@@ -989,8 +989,8 @@ ${st.charges.map((c) => { const u = c.usage || {}; return html`<tr><td data-labe
         const got = await net(req, res, (t) => network.projects.apps(t, project.id));
         const list = got.ok ? (Array.isArray(got.data) ? got.data : (got.data && got.data.apps) || []) : [];
         const sandbox = list.filter((a) => a.environment === 'sandbox' && !a.revoked_at);
-        const app = sandbox.find((a) => (a.grants || []).includes('ai.inference.create')) || sandbox[0] || null;
-        const granted = !!(app && (app.grants || []).includes('ai.inference.create'));
+        const app = sandbox.find((a) => (a.grants || []).includes('ai.app.run')) || sandbox[0] || null;
+        const granted = !!(app && (app.grants || []).includes('ai.app.run'));
         const runs = app ? await playground.runsFor(app.id).catch(() => []) : [];
         const called = runs.some((x) => x.kind === 'ai' && x.outcome === 'ok');
         let credits = null;
@@ -1000,7 +1000,7 @@ ${st.charges.map((c) => { const u = c.usage || {}; return html`<tr><td data-labe
         const c = csrf(req);
         const steps = [
             { done: !!app, title: 'A sandbox app', text: app ? html`<b>${app.name}</b> runs in the sandbox: it can try everything and spend nothing real.` : html`An app is what calls the API. Make a sandbox one first; production comes when you are ready.`, action: app ? '' : html`<a class="mx-apply" href="${base}#apps">Make a sandbox app</a>` },
-            { done: granted, title: 'Permission to call AI', text: html`The app needs <code>ai.inference.create</code>. Sandbox apps get it at once.`, action: app && !granted ? html`<form method="post" action="${base}/apps/${app.id}/grants">${csrfField(c)}<input type="hidden" name="capability" value="ai.inference.create"><button class="mx-apply" type="submit">Ask for it</button></form>` : '' },
+            { done: granted, title: 'Permission to call AI', text: html`The app needs <code>ai.app.run</code>. Sandbox apps get it at once.`, action: app && !granted ? html`<form method="post" action="${base}/apps/${app.id}/grants">${csrfField(c)}<input type="hidden" name="capability" value="ai.app.run"><button class="mx-apply" type="submit">Ask for it</button></form>` : '' },
             { done: !!app, title: 'Its key', text: html`The app's secret was shown once when it was made; OpenVibe keeps only its hash. Lost it? Rotate it on the app's page.`, action: app ? html`<a class="mx-copy" href="${base}/apps/${app.id}">The app's page</a>` : '' },
             { done: called, title: 'A first call', text: html`Ask anything in the playground, as the app: you see the answer, the model that gave it, and what it cost.`, action: app && granted ? html`<a class="mx-apply" href="${base}/apps/${app.id}/playground#ai">Open the playground</a>` : '' },
             { done: funded, title: 'Credits', text: credits ? html`Balance <b>${usd(credits.balance_nano_usd)}</b>. Paid models spend Credits; your own keys and the sandbox never do.` : html`Credits are not open yet: the sandbox and your own keys work without them.`, action: html`<a class="mx-copy" href="${base}/credits">See Credits</a>` },

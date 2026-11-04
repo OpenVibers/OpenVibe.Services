@@ -1,6 +1,6 @@
 'use strict';
 /**
- * The AI playground (AI Exchange P8): one chat reply as the APP, with its own ai.inference.create token (AI Exchange D8), behind
+ * The AI playground (AI Exchange P8): one chat reply as the APP, with its own ai.app.run token (AI Exchange D8'), behind
  * SERVICES_AI_PLAYGROUND. Refused without the grant (nothing requested); with it, the app token goes to OpenVibe AI,
  * the reply and the openvibe disclosure are shown once, and the run log keeps neither the prompt nor the reply.
  */
@@ -20,7 +20,7 @@ const http = require('http');
                 id: 'chatcmpl_test1', model: 'qwen/qwen3-4b:q4_k_m@3f2a1c9',
                 choices: [{ index: 0, message: { role: 'assistant', content: 'Hello from a tiny model here.' }, finish_reason: 'stop' }],
                 usage: { prompt_tokens: 12, completion_tokens: 7, total_tokens: 19 },
-                openvibe: { resolved_model: 'qwen/qwen3-4b:q4_k_m@3f2a1c9', revision: '3f2a1c9', provider_access: 'OWN_DEPLOYMENT', policy: 'balanced', rate_version: 'r-7', fallback_reason: null },
+                x_openvibe: { run_id: 'run_test1', provider: 'own', fallback_used: false, cost_usd: 0, resolved_model: 'qwen/qwen3-4b:q4_k_m@3f2a1c9', revision: '3f2a1c9', provider_access: 'OWN_DEPLOYMENT', policy: 'balanced', rate_version: 'r-7', fallback_reason: null },
             }));
         });
     });
@@ -49,26 +49,19 @@ const http = require('http');
     const base = `/projects/${projectId}/apps/${app.id}`;
     const ask = (fields) => t.get(`${base}/playground/ai`, { as: owner, form: { model: 'openvibe', prompt: 'Say hello in five words.', max_tokens: '64', ...fields } });
     try {
-        await check('without ai.inference.create: refused at the grant step, OpenVibe AI never called', async () => {
+        await check('without ai.app.run: refused at the grant step, OpenVibe AI never called', async () => {
             const r = await ask({ credential_type: 'client_secret', credential: app.secret });
             assert.strictEqual(r.status, 403, String((r.text.match(/<div class="(?:result|notice)[^>]*>[\s\S]{0,300}/) || [r.status])[0]));
-            assert.match(r.text, /does not hold ai\.inference\.create/);
+            assert.match(r.text, /does not hold ai\.app\.run/);
             assert.strictEqual(asked.length, 0);
             const page = await t.get(`${base}/playground`, { as: owner });
             assert.match(page.text, /AI: one chat reply/);
             assert.ok(!page.text.includes(`action="${base}/playground/ai"`), 'no form without the grant');
         });
 
-        // The success path needs Network to mint a token carrying ai.inference.create, which it does only once the pinned
-        // openvibe-contracts has the capability (AI Exchange D8, job aix-p1-contracts). Until then these two say so.
-        const contracts = require('openvibe-contracts');
-        const hasD8 = !!(contracts.capabilities && contracts.capabilities.get && contracts.capabilities.get('ai.inference.create'));
-        if (!hasD8) {
-            console.log('  (pending AI Exchange D8: openvibe-contracts has no ai.inference.create yet; the success path is not run)');
-        }
-        if (hasD8) {
+        {   // the success path: ai.app.run is the existing public capability apps call AI with (D8')
         await check('with the grant: the app token goes to OpenVibe AI; the reply and what answered are shown', async () => {
-            await t.grant(owner, projectId, app.id, 'ai.inference.create');   // through Services' own grant flow (D8, Contracts v0.284.0)
+            await t.grant(owner, projectId, app.id, 'ai.app.run');   // through Services' own grant flow (D8, Contracts v0.284.0)
             const r = await ask({ credential_type: 'client_secret', credential: app.secret });
             assert.strictEqual(r.status, 200, String((r.text.match(/<div class="result[^>]*>[\s\S]{0,400}/) || [r.status])[0]));
             assert.strictEqual(asked.length, 1);

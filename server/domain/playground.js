@@ -8,7 +8,7 @@
  *                                                                              source app-<app ulid>)
  *   media    upload one small file (sandbox)   needs media.object.upload    (audience openvibe.media,
  *                                                                              namespace = project id)
-  *   ai       one chat reply (AI Exchange P8)   needs ai.inference.create        (audience openvibe.ai; POST /v1/chat/completions,
+  *   ai       one chat reply (AI Exchange P8)   needs ai.app.run               (audience openvibe.ai; POST /v1/chat/completions,
  *                                                                              not streamed; behind SERVICES_AI_PLAYGROUND). The prompt
  *                                                                              and the reply are shown once and never stored.
  *
@@ -39,8 +39,8 @@ const KINDS = {
     // `needs`: the capability the APP must hold (owned by Events / Media; Services guards nothing with it).
     events: { needs: 'events.app.publish', audience: 'openvibe.events', label: 'Events: publish a test event' },
     media: { needs: 'media.object.upload', audience: 'openvibe.media', label: 'Media: upload a file to the sandbox' },
-    // ai.inference.create: the PUBLIC capability developer apps call AI with (AI Exchange D8; ai.run.create stays first-party).
-    ai: { needs: 'ai.inference.create', audience: 'openvibe.ai', label: 'AI: one chat reply' },
+    // ai.app.run: the public capability developer apps already call AI with (ADR-014; AI Exchange D8').
+    ai: { needs: 'ai.app.run', audience: 'openvibe.ai', label: 'AI: one chat reply' },
 };
 const MODEL_ID = /^[A-Za-z0-9._:/@-]{1,160}$/;
 
@@ -233,7 +233,7 @@ function createPlayground({ store, config, network, keys, fetchImpl, log = conso
             const choice = Array.isArray(doc.choices) && doc.choices[0] ? doc.choices[0] : {};
             const reply = String((choice.message && choice.message.content) || '').slice(0, 8000);
             const out = await finish({ outcome: 'ok', stage: 'done', http_status: res.status, detail: `answered by ${String(doc.model || aiBody.model).slice(0, 160)}`, ref: doc.id ? String(doc.id).slice(0, 120) : null });
-            return { ...out, result: { model: doc.model || aiBody.model, reply, finish_reason: choice.finish_reason || null, usage: doc.usage || null, openvibe: doc.openvibe || null } };
+            return { ...out, result: { model: doc.model || aiBody.model, reply, finish_reason: choice.finish_reason || null, usage: doc.usage || null, openvibe: doc.x_openvibe || doc.openvibe || null } };
         }
 
         const client = sdkClient(tok.token);

@@ -2,8 +2,8 @@
 
 /**
  * GET /docs/ai (AI Exchange P8): the developer guide to OpenVibe AI's API, as the decisions of the AI Exchange define it
- * (CHECKPOINT D1-D3, D8-D10): one base URL for the OpenAI and Anthropic SDKs, exact model ids and dynamic names, the
- * `openvibe` object every answer carries, prices to the nano-dollar with holds, streaming, errors, BYOK, privacy and
+ * (CHECKPOINT D1-D3, D8'-D10): one base URL for the OpenAI and Anthropic SDKs, exact model ids and dynamic names, the
+ * `x_openvibe` object every answer carries, prices to the nano-dollar with holds, streaming, errors, BYOK, privacy and
  * sandbox. Behind SERVICES_MODEL_EXPLORER with the model pages (no public promise before the owner approves); noindex.
  */
 
@@ -37,13 +37,13 @@ function createAiDocsRoutes(appCtx) {
 <section class="mx-card" id="start" aria-labelledby="start-h">
   <h2 id="start-h">Start in three steps</h2>
   <ol class="mx-steps">
-    <li><b>A project and an app.</b> Create a project on <a href="/projects">Projects</a> and a sandbox app in it; ask for <code>ai.inference.create</code> on the app.</li>
+    <li><b>A project and an app.</b> Create a project on <a href="/projects">Projects</a> and a sandbox app in it; ask for <code>ai.app.run</code> on the app (sandbox apps get it at once).</li>
     <li><b>Its key.</b> The app's credential is shown once. Keep it in your environment as <code>OPENVIBE_API_KEY</code>; OpenVibe stores only its hash.</li>
     <li><b>The first call.</b> The base URL is <code>${AI}/v1</code> for the OpenAI SDK and <code>${AI}</code> for the Anthropic one.</li>
   </ol>
   ${block('curl', `curl ${AI}/v1/chat/completions \\\n  -H "Authorization: Bearer $OPENVIBE_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model": "openvibe/auto", "messages": [{"role": "user", "content": "Hello"}]}'`)}
   <details class="mx-more"><summary>OpenAI and Anthropic SDKs (2)</summary>
-  ${block('OpenAI SDK · JavaScript', `import OpenAI from 'openai';\n\nconst ai = new OpenAI({ baseURL: '${AI}/v1', apiKey: process.env.OPENVIBE_API_KEY });\nconst reply = await ai.chat.completions.create({ model: 'openvibe/auto', messages: [{ role: 'user', content: 'Hello' }] });\nconsole.log(reply.choices[0].message.content, reply.openvibe);`)}
+  ${block('OpenAI SDK · JavaScript', `import OpenAI from 'openai';\n\nconst ai = new OpenAI({ baseURL: '${AI}/v1', apiKey: process.env.OPENVIBE_API_KEY });\nconst reply = await ai.chat.completions.create({ model: 'openvibe/auto', messages: [{ role: 'user', content: 'Hello' }] });\nconsole.log(reply.choices[0].message.content, reply.x_openvibe);`)}
   ${block('Anthropic SDK · Python', `import anthropic, os\n\nai = anthropic.Anthropic(base_url="${AI}", api_key=os.environ["OPENVIBE_API_KEY"])\nreply = ai.messages.create(model="openvibe/auto", max_tokens=1024, messages=[{"role": "user", "content": "Hello"}])\nprint(reply.content[0].text)`)}
   </details>
 </section>
@@ -64,7 +64,7 @@ function createAiDocsRoutes(appCtx) {
 
 <section class="mx-card" id="answer" aria-labelledby="answer-h">
   <h2 id="answer-h">What every answer says</h2>
-  <p>Each response carries an <code>openvibe</code> object (in a stream: the first comment line, and the last chunk):</p>
+  <p>Each response carries an <code>x_openvibe</code> object (in a stream: just before <code>[DONE]</code>), beside the <code>run_id</code>, <code>provider</code>, <code>fallback_used</code> and <code>cost_usd</code> it already has:</p>
   <div class="mx-table-wrap is-vs"><table class="mx-table mx-vs"><tbody>
     ${row([html`<code>resolved_model</code>`, 'The exact id that answered'])}
     ${row([html`<code>revision</code>`, 'Its build'])}

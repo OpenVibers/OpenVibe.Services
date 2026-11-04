@@ -67,7 +67,7 @@ const { daily } = require('../server/domain/credits');
             h = await page();
             assert.match(h, /<span class="ob-n" aria-hidden="true">2<\/span>[\s\S]*?Next/, 'then: the permission');
             assert.match(h, new RegExp(`action="/projects/${projectId}/apps/${app.id}/grants"`), 'with the button that asks for it');
-            await t.grant(owner, projectId, app.id, 'ai.inference.create');
+            await t.grant(owner, projectId, app.id, 'ai.app.run');
             h = await page();
             assert.match(h, new RegExp(`href="/projects/${projectId}/apps/${app.id}/playground#ai"`), 'then: the playground');
             assert.match(h, /Balance <b>\$0\.00499<\/b>/, 'and the Credits, read from Billing');
