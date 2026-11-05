@@ -41,7 +41,7 @@ async function startNetworkStub() {
                 tables: TABLES,
                
                 taskKeyed: ["manifests","releases"],
-                exempt: {account_data_events: 'the ledger of requests itself: which export and deletion Services applied'},
+                exempt: {account_data_events: 'the ledger of requests itself: which export and deletion Services applied', config_snapshots: 'D11 configuration revisions: created_by names the owner who changed a setting, not a person\'s account data' },
             });
             assert.deepStrictEqual(missing, [], `a table with a person column is neither covered nor exempted: ${missing.join(', ')}`);
         } finally { await d.close(); }

@@ -1,0 +1,515 @@
+{
+  "note": "PREVIEW FIXTURE for the developer portal (AI Exchange P8). Every model validates as ai.model@1 (openvibe-contracts v0.284.0; test/models.test.js checks it). Prices are EXAMPLES, not offers; revisions are 'preview' and sha256 is null until OpenVibe.AI publishes verified artifacts. Never shown publicly: the pages are behind SERVICES_MODEL_EXPLORER and say 'example prices'.",
+  "as_of": "2026-11-03",
+  "aliases": [
+    {
+      "id": "openvibe/auto",
+      "object": "model",
+      "dynamic": true,
+      "name": "Auto",
+      "policy": "balanced",
+      "description": "Picks among the models you allow, per request, and tells you which one answered and why.",
+      "capabilities": [
+        "tools",
+        "json",
+        "stream"
+      ]
+    },
+    {
+      "id": "openvibe/economy",
+      "object": "model",
+      "dynamic": true,
+      "name": "Economy",
+      "policy": "cheapest",
+      "description": "The lowest cost per successful answer that still meets the quality floor.",
+      "capabilities": [
+        "json",
+        "stream"
+      ]
+    },
+    {
+      "id": "openvibe/balanced",
+      "object": "model",
+      "dynamic": true,
+      "name": "Balanced",
+      "policy": "balanced",
+      "description": "Cost, success rate and speed weighed together.",
+      "capabilities": [
+        "tools",
+        "json",
+        "stream"
+      ]
+    },
+    {
+      "id": "openvibe/fast",
+      "object": "model",
+      "dynamic": true,
+      "name": "Fast",
+      "policy": "fastest",
+      "description": "The quickest first token under your cost cap.",
+      "capabilities": [
+        "json",
+        "stream"
+      ]
+    },
+    {
+      "id": "openvibe/private",
+      "object": "model",
+      "dynamic": true,
+      "name": "Private",
+      "policy": "private",
+      "description": "Never leaves OpenVibe-run machines or your own.",
+      "capabilities": [
+        "json",
+        "stream"
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "qwen/qwen3-4b-abliterated:q4_k_m@preview",
+      "provider_key": "qwen",
+      "model_key": "qwen3-4b-abliterated:q4_k_m",
+      "display_name": "Qwen3 4B Abliterated",
+      "type": "chat",
+      "status": "active",
+      "cost": {
+        "in_per_mtok": null,
+        "out_per_mtok": null,
+        "cached_per_mtok": null
+      },
+      "supports": {
+        "json": true,
+        "tools": true,
+        "streaming": true,
+        "vision": false
+      },
+      "family": "qwen3",
+      "variant": "abliterated",
+      "quant": "q4_k_m",
+      "revision": "preview",
+      "license": "apache-2.0",
+      "context": 32768,
+      "max_output": 8192,
+      "capabilities": {
+        "tools": true,
+        "json": true,
+        "vision": false,
+        "stream": true
+      },
+      "modalities": [
+        "text"
+      ],
+      "retail_rate": {
+        "version": "example-1",
+        "input_nano_usd_per_m": "20000000",
+        "cached_read_nano_usd_per_m": "5000000",
+        "cache_write_nano_usd_per_m": "20000000",
+        "output_nano_usd_per_m": "60000000"
+      },
+      "availability": "unavailable",
+      "metadata": {
+        "org": "qwen",
+        "base_model": "qwen/qwen3-4b",
+        "modification": {
+          "method": "abliteration",
+          "note": "Refusal direction removed from the weights. Not a guarantee of quality or of no refusals."
+        },
+        "access": [
+          "OWN_DEPLOYMENT"
+        ],
+        "availability_note": "planned",
+        "hardware": "One 8-12 GB GPU",
+        "quality": {
+          "bench_url": null,
+          "score": null,
+          "samples": 0
+        },
+        "input_modalities": [
+          "text"
+        ],
+        "per_request_nano_usd": "0"
+      }
+    },
+    {
+      "id": "qwen/qwen3-4b:q4_k_m@preview",
+      "provider_key": "qwen",
+      "model_key": "qwen3-4b:q4_k_m",
+      "display_name": "Qwen3 4B",
+      "type": "chat",
+      "status": "active",
+      "cost": {
+        "in_per_mtok": null,
+        "out_per_mtok": null,
+        "cached_per_mtok": null
+      },
+      "supports": {
+        "json": true,
+        "tools": true,
+        "streaming": true,
+        "vision": false
+      },
+      "family": "qwen3",
+      "variant": "original",
+      "quant": "q4_k_m",
+      "revision": "preview",
+      "license": "apache-2.0",
+      "context": 32768,
+      "max_output": 8192,
+      "capabilities": {
+        "tools": true,
+        "json": true,
+        "vision": false,
+        "stream": true
+      },
+      "modalities": [
+        "text"
+      ],
+      "retail_rate": {
+        "version": "example-1",
+        "input_nano_usd_per_m": "20000000",
+        "cached_read_nano_usd_per_m": "5000000",
+        "cache_write_nano_usd_per_m": "20000000",
+        "output_nano_usd_per_m": "60000000"
+      },
+      "availability": "unavailable",
+      "metadata": {
+        "org": "qwen",
+        "access": [
+          "OWN_DEPLOYMENT"
+        ],
+        "availability_note": "planned",
+        "hardware": "One 8-12 GB GPU",
+        "quality": {
+          "bench_url": null,
+          "score": null,
+          "samples": 0
+        },
+        "input_modalities": [
+          "text"
+        ],
+        "per_request_nano_usd": "0"
+      }
+    },
+    {
+      "id": "qwen/qwen3-8b-abliterated:q4_k_m@preview",
+      "provider_key": "qwen",
+      "model_key": "qwen3-8b-abliterated:q4_k_m",
+      "display_name": "Qwen3 8B Abliterated",
+      "type": "chat",
+      "status": "active",
+      "cost": {
+        "in_per_mtok": null,
+        "out_per_mtok": null,
+        "cached_per_mtok": null
+      },
+      "supports": {
+        "json": true,
+        "tools": true,
+        "streaming": true,
+        "vision": false
+      },
+      "family": "qwen3",
+      "variant": "abliterated",
+      "quant": "q4_k_m",
+      "revision": "preview",
+      "license": "apache-2.0",
+      "context": 32768,
+      "max_output": 8192,
+      "capabilities": {
+        "tools": true,
+        "json": true,
+        "vision": false,
+        "stream": true
+      },
+      "modalities": [
+        "text"
+      ],
+      "retail_rate": {
+        "version": "example-1",
+        "input_nano_usd_per_m": "40000000",
+        "cached_read_nano_usd_per_m": "10000000",
+        "cache_write_nano_usd_per_m": "40000000",
+        "output_nano_usd_per_m": "120000000"
+      },
+      "availability": "unavailable",
+      "metadata": {
+        "org": "qwen",
+        "base_model": "qwen/qwen3-8b",
+        "modification": {
+          "method": "abliteration",
+          "note": "Refusal direction removed from the weights. Benchmarked separately from the original."
+        },
+        "access": [
+          "OWN_DEPLOYMENT"
+        ],
+        "availability_note": "planned",
+        "hardware": "One 12-16 GB GPU",
+        "quality": {
+          "bench_url": null,
+          "score": null,
+          "samples": 0
+        },
+        "input_modalities": [
+          "text"
+        ],
+        "per_request_nano_usd": "0"
+      }
+    },
+    {
+      "id": "google/gemma-3-27b-abliterated:q4_k_m@preview",
+      "provider_key": "google",
+      "model_key": "gemma-3-27b-abliterated:q4_k_m",
+      "display_name": "Gemma 3 27B Abliterated",
+      "type": "vision",
+      "status": "active",
+      "cost": {
+        "in_per_mtok": null,
+        "out_per_mtok": null,
+        "cached_per_mtok": null
+      },
+      "supports": {
+        "json": true,
+        "tools": false,
+        "streaming": true,
+        "vision": true
+      },
+      "family": "gemma3",
+      "variant": "abliterated",
+      "quant": "q4_k_m",
+      "revision": "preview",
+      "license": "gemma",
+      "context": 32768,
+      "max_output": 8192,
+      "capabilities": {
+        "tools": false,
+        "json": true,
+        "vision": true,
+        "stream": true
+      },
+      "modalities": [
+        "image",
+        "text"
+      ],
+      "retail_rate": {
+        "version": "example-1",
+        "input_nano_usd_per_m": "90000000",
+        "cached_read_nano_usd_per_m": "25000000",
+        "cache_write_nano_usd_per_m": "90000000",
+        "output_nano_usd_per_m": "250000000"
+      },
+      "availability": "unavailable",
+      "metadata": {
+        "org": "google",
+        "base_model": "google/gemma-3-27b-it",
+        "modification": {
+          "method": "abliteration",
+          "note": "Community abliteration of the instruction-tuned model; Gemma terms apply."
+        },
+        "access": [
+          "OWN_DEPLOYMENT"
+        ],
+        "availability_note": "planned",
+        "hardware": "One 24 GB GPU",
+        "quality": {
+          "bench_url": null,
+          "score": null,
+          "samples": 0
+        },
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "per_request_nano_usd": "0"
+      }
+    },
+    {
+      "id": "deepseek/deepseek-v3.2@preview",
+      "provider_key": "deepseek",
+      "model_key": "deepseek-v3.2",
+      "display_name": "DeepSeek V3.2",
+      "type": "chat",
+      "status": "active",
+      "cost": {
+        "in_per_mtok": null,
+        "out_per_mtok": null,
+        "cached_per_mtok": null
+      },
+      "supports": {
+        "json": true,
+        "tools": true,
+        "streaming": true,
+        "vision": false
+      },
+      "family": "deepseek-v3",
+      "variant": "original",
+      "quant": "fp8",
+      "revision": "preview",
+      "license": "mit",
+      "context": 131072,
+      "max_output": 8192,
+      "capabilities": {
+        "tools": true,
+        "json": true,
+        "vision": false,
+        "stream": true
+      },
+      "modalities": [
+        "text"
+      ],
+      "retail_rate": {
+        "version": "example-1",
+        "input_nano_usd_per_m": "300000000",
+        "cached_read_nano_usd_per_m": "30000000",
+        "cache_write_nano_usd_per_m": "300000000",
+        "output_nano_usd_per_m": "450000000"
+      },
+      "availability": "limited",
+      "metadata": {
+        "org": "deepseek",
+        "access": [
+          "CUSTOMER_BYOK",
+          "UNVERIFIED"
+        ],
+        "availability_note": "byok_only",
+        "hardware": "Large MoE: through a partner",
+        "quality": {
+          "bench_url": null,
+          "score": null,
+          "samples": 0
+        },
+        "input_modalities": [
+          "text"
+        ],
+        "per_request_nano_usd": "0"
+      }
+    },
+    {
+      "id": "zai/glm-4.6@preview",
+      "provider_key": "zai",
+      "model_key": "glm-4.6",
+      "display_name": "GLM 4.6",
+      "type": "chat",
+      "status": "active",
+      "cost": {
+        "in_per_mtok": null,
+        "out_per_mtok": null,
+        "cached_per_mtok": null
+      },
+      "supports": {
+        "json": true,
+        "tools": true,
+        "streaming": true,
+        "vision": false
+      },
+      "family": "glm",
+      "variant": "original",
+      "quant": "fp8",
+      "revision": "preview",
+      "license": "mit",
+      "context": 131072,
+      "max_output": 16384,
+      "capabilities": {
+        "tools": true,
+        "json": true,
+        "vision": false,
+        "stream": true
+      },
+      "modalities": [
+        "text"
+      ],
+      "retail_rate": {
+        "version": "example-1",
+        "input_nano_usd_per_m": "450000000",
+        "cached_read_nano_usd_per_m": "110000000",
+        "cache_write_nano_usd_per_m": "450000000",
+        "output_nano_usd_per_m": "1600000000"
+      },
+      "availability": "unavailable",
+      "metadata": {
+        "org": "zai",
+        "access": [
+          "CUSTOMER_BYOK",
+          "UNVERIFIED"
+        ],
+        "availability_note": "pending_agreement",
+        "hardware": "Large MoE: through a partner",
+        "quality": {
+          "bench_url": null,
+          "score": null,
+          "samples": 0
+        },
+        "input_modalities": [
+          "text"
+        ],
+        "per_request_nano_usd": "0"
+      }
+    },
+    {
+      "id": "mistral/devstral-small-2505:q4_k_m@preview",
+      "provider_key": "mistral",
+      "model_key": "devstral-small-2505:q4_k_m",
+      "display_name": "Devstral Small",
+      "type": "chat",
+      "status": "active",
+      "cost": {
+        "in_per_mtok": null,
+        "out_per_mtok": null,
+        "cached_per_mtok": null
+      },
+      "supports": {
+        "json": true,
+        "tools": true,
+        "streaming": true,
+        "vision": false
+      },
+      "family": "devstral",
+      "variant": "finetuned",
+      "quant": "q4_k_m",
+      "revision": "preview",
+      "license": "apache-2.0",
+      "context": 131072,
+      "max_output": 8192,
+      "capabilities": {
+        "tools": true,
+        "json": true,
+        "vision": false,
+        "stream": true
+      },
+      "modalities": [
+        "text"
+      ],
+      "retail_rate": {
+        "version": "example-1",
+        "input_nano_usd_per_m": "70000000",
+        "cached_read_nano_usd_per_m": "20000000",
+        "cache_write_nano_usd_per_m": "70000000",
+        "output_nano_usd_per_m": "200000000"
+      },
+      "availability": "unavailable",
+      "metadata": {
+        "org": "mistral",
+        "base_model": "mistral/mistral-small-3.1",
+        "modification": {
+          "method": "fine-tune",
+          "note": "Tuned by Mistral for coding agents."
+        },
+        "access": [
+          "OWN_DEPLOYMENT",
+          "CUSTOMER_BYOK"
+        ],
+        "availability_note": "planned",
+        "hardware": "One 24 GB GPU",
+        "quality": {
+          "bench_url": null,
+          "score": null,
+          "samples": 0
+        },
+        "input_modalities": [
+          "text"
+        ],
+        "per_request_nano_usd": "0"
+      }
+    }
+  ]
+}

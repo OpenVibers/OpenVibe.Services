@@ -121,7 +121,7 @@ function publicPages({ docs }) {
         { path: '/policy/licensing', changefreq: 'monthly', priority: 0.4 },
         { path: '/policy/transparency', changefreq: 'monthly', priority: 0.4 },
     ];
-    for (const c of docs.contracts) pages.push({ path: `/docs/contracts/${c.id}`, changefreq: 'monthly', priority: 0.4 });
+    for (const c of docs.contracts) pages.push({ path: c.href, changefreq: 'monthly', priority: c.latest ? 0.4 : 0.2 });
     for (const c of docs.capabilities) pages.push({ path: `/docs/capabilities/${c.id}`, changefreq: 'monthly', priority: 0.4 });
     for (const x of contracts.openapi.index()) pages.push({ path: `/docs/api/${x.service}`, changefreq: 'monthly', priority: 0.4 });
     for (const m of docs.sdk) pages.push({ path: `/docs/sdk/${m.slug}`, changefreq: 'monthly', priority: 0.3 });
@@ -139,8 +139,8 @@ function describePage(pathname, { docs, apiIndex = [] }) {
     if (PAGE_TEXT[pathname]) return { title: PAGE_TEXT[pathname][0], text: PAGE_TEXT[pathname][1] };
     let m;
     if ((m = /^\/docs\/contracts\/([^/]+)$/.exec(pathname))) {
-        const c = docs.contracts.find((x) => x.id === m[1]);
-        if (c) return { title: c.title, text: seo.clip(c.description, 200) };
+        const c = docs.contracts.find((x) => x.ref === m[1]);
+        if (c) return { title: c.latest ? c.title : `${c.title} (${c.id}@${c.major})`, text: seo.clip(c.description, 200) };
     }
     if ((m = /^\/docs\/capabilities\/([^/]+)$/.exec(pathname))) {
         const c = docs.capabilities.find((x) => x.id === m[1]);

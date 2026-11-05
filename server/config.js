@@ -104,6 +104,8 @@ function loadConfig(env = process.env) {
         playground: {
             eventsUrl: trim(env.SERVICES_PLAYGROUND_EVENTS_URL || originOf('events', 'https://openvibe.events')),
             mediaUrl: trim(env.SERVICES_PLAYGROUND_MEDIA_URL || originOf('media', 'https://openvibe.media')),
+            aiUrl: trim(env.SERVICES_PLAYGROUND_AI_URL || originOf('ai', 'https://ai.openvibe.services')),
+            ai: env.SERVICES_AI_PLAYGROUND === '1',
             maxUploadBytes: int(env.SERVICES_PLAYGROUND_MAX_UPLOAD_BYTES, 1024 * 1024),
             runsPerHour: int(env.SERVICES_PLAYGROUND_RUNS_PER_HOUR, 60),
         },
