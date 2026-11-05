@@ -79,7 +79,7 @@ function createAiDocsRoutes(appCtx) {
   <h2 id="prices-h">Prices and caps</h2>
   <p>A model has four prices per million tokens: input, cached input, cache write and output, and sometimes a per-request fee. One request costs each class's tokens times its price, <b>rounded up once per class</b>, to the nano-dollar ($0.000000001). Nothing is rounded per token or to a cent.</p>
   <p>For example, at $0.04 / $0.01 / $0.04 / $0.12 per million, a request of 1,200 input, 8,000 cached and 400 output tokens costs <b>${usd(exCost)}</b>; a thousand of them, ${usd(exCost, { per: 1000 })}.</p>
-  <p><b>Credits</b> pay for it: your project's prepaid balance in dollars. Before a request runs, the most it can cost is held from your balance; when it ends, only what was used is charged and the rest is released at once. Set <code>max_cost_usd</code> on a request to cap it; a request that would exceed your balance or cap is refused before it runs (402).</p>
+  <p><b>Balance</b> pays for it: your project's prepaid dollars, one for one with USD. Before a request runs, the most it can cost is held from your balance; when it ends, only what was used is charged and the rest is released at once. Set <code>max_cost_usd</code> on a request to cap it; a request that would exceed your balance or cap is refused before it runs (402).</p>
 </section>
 
 <section class="mx-card" id="stream" aria-labelledby="stream-h">
@@ -92,7 +92,7 @@ function createAiDocsRoutes(appCtx) {
   <div class="mx-table-wrap is-vs"><table class="mx-table mx-vs"><thead><tr><th scope="col">Status</th><th scope="col">Code</th><th scope="col">Means</th></tr></thead><tbody>
     ${row(['404', html`<code>ai.model_not_found</code>`, 'No such model id'])}
     ${row(['400', html`<code>ai.model_unavailable</code>`, 'The exact build cannot run now; nothing else was tried'])}
-    ${row(['402', html`<code>billing.insufficient_funds</code>`, 'Your Credits (or your cap) do not cover the request'])}
+    ${row(['402', html`<code>billing.insufficient_funds</code>`, 'Your Balance (or your cap) does not cover the request'])}
     ${row(['409', html`<code>billing.hold_key_reused</code>`, 'An idempotency key was reused with a different request'])}
     ${row(['429', html`<code>rate_limited</code>`, 'Too many requests for your project now; retry after the header says'])}
   </tbody></table></div>
@@ -103,7 +103,7 @@ function createAiDocsRoutes(appCtx) {
   <ul class="mx-list">
     <li><b>Your own provider keys (BYOK).</b> Add them on Your AI; requests they serve are billed by that provider, and OpenVibe charges nothing for them.</li>
     <li><b>Private.</b> <code>openvibe/private</code>, or a private class in your project, keeps a request on OpenVibe-run machines or your own. No prompt or answer is kept in logs, caches or analytics.</li>
-    <li><b>Sandbox apps</b> run on sandbox credit only: test freely, nothing is charged and no paid provider is used.</li>
+    <li><b>Sandbox apps</b> run on sandbox Balance only: test freely, nothing is charged and no paid provider is used.</li>
   </ul>
 </section>
 </div>`;

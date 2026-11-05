@@ -15,6 +15,7 @@
  *   /docs/events                event types from the service manifests
  *   /docs/services              the Network's registry with health as reported (never invented)
  *   /docs/billing               the billing policy as OpenVibe.Billing's /policy.json states it (never restated)
+ *   /docs/vibes, /docs/balance  the D12 money guides (http/money-docs.js)
  *   /docs/limits                limits and tiers: each service's /limits.json as it answers (never restated)
  *   /docs/export                the project export: the metadata JSON and the full archive's layout
  *   /docs/sdk[/:module]         SDK reference from its .d.ts files
@@ -64,7 +65,7 @@ function createDocsViews(ctx) {
             description: `OpenVibe platform reference generated from openvibe-contracts v${docs.contractsVersion} and openvibe-sdk v${docs.sdkVersion}.`,
             crumbs: [{ label: 'Docs' }],
             body: html`<h1>Platform reference</h1>${versions()}
-<p>Nothing on these pages is written by hand: each one is rendered from the published packages above when Services starts, so it always matches what the platform runs against. If something is missing here, it is not part of the public surface yet (<a href="/policy/compatibility">why</a>).</p>
+<p>Most of these pages are generated: each one is rendered from the published packages above when Services starts, so it always matches what the platform runs against. The two money guides (<a href="/docs/vibes">Vibes</a> and <a href="/docs/balance">Balance</a>) are written from the platform's money decisions. If something is missing here, it is not part of the public surface yet (<a href="/policy/compatibility">why</a>).</p>
 <ul class="cards">
 <li><a href="/docs/contracts"><strong>Contracts</strong></a><span>${docs.contracts.length} JSON Schemas with fields, examples and versions</span></li>
 <li><a href="/docs/api"><strong>API explorer</strong></a><span>${apiIndex.reduce((n, s) => n + s.operations, 0)} routes across ${apiIndex.length} services, with their capabilities and schemas (OpenAPI 3.1)</span></li>
@@ -76,6 +77,8 @@ function createDocsViews(ctx) {
 <li><a href="https://openvibe.codes/harnesses"><strong>Coding harnesses</strong></a><span>the coding agents OpenVibe.Codes routes a task to, with their capabilities, prices and limits</span></li>
 <li><a href="/docs/billing"><strong>Billing policy</strong></a><span>prices, the creator split, fees, holds and cashouts, live from OpenVibe.Billing</span></li>
 <li><a href="/docs/limits"><strong>Limits and tiers</strong></a><span>what a project may do in sandbox and production, live from the services that enforce it</span></li>
+<li><a href="/docs/vibes"><strong>Vibes</strong></a><span>the social currency, and selling something with Vibes Pay: SDK, HTTP, webhooks, sandbox, refunds, payouts</span></li>
+<li><a href="/docs/balance"><strong>Balance</strong></a><span>how metered usage bills a project's Balance, adding money and moving money to a project</span></li>
 <li><a href="/docs/export"><strong>Project export</strong></a><span>take a project with you: its configuration, modules, objects and events as one download</span></li>
 <li><a href="/docs/sdk"><strong>SDK</strong></a><span>${docs.sdk.length} modules of openvibe-sdk from their type definitions</span></li>
 <li><a href="/policy/rfc"><strong>Decisions</strong></a><span>${docs.adrs.length} architecture decision records</span></li>

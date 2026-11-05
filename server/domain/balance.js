@@ -1,17 +1,20 @@
 'use strict';
 
 /**
- * A project's Credits (AI Exchange D9) as Services shows them: OpenVibe.Billing is the authority (GET /api/me/credits,
- * the person's own token); Services only reads and draws. Nothing is stored here.
+ * A project's Balance (D12, the D9 page renamed) as Services shows it: OpenVibe.Billing is the authority (its
+ * project statement, the person's own token); Services only reads and draws. Nothing is stored here.
  *
- *   createCreditsReader({ config, fetchImpl })
+ *   createBalanceReader({ fetchImpl })
  *     statement(token, projectId) → { project_id, balance_nano_usd, held_nano_usd, available_nano_usd, charges[] }
  *   daily(charges, days, now) → [{ day, nano }] (the last `days` days, oldest first; BigInt nano-USD)
+ *
+ * Billing's project statement wire path is /api/me/credits?project_id; D12 keeps it as the alias of the project
+ * Balance read, so Services never needs to hold or recompute a balance of its own.
  */
 
 const BILLING = () => String(process.env.OV_BILLING_INTERNAL_URL || 'http://127.0.0.1:4600').replace(/\/+$/, '');
 
-function createCreditsReader({ fetchImpl = globalThis.fetch } = {}) {
+function createBalanceReader({ fetchImpl = globalThis.fetch } = {}) {
     async function statement(token, projectId) {
         const res = await fetchImpl(`${BILLING()}/api/me/credits?project_id=${encodeURIComponent(projectId)}`, {
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, signal: AbortSignal.timeout(5000),
@@ -41,4 +44,4 @@ function daily(charges, days = 30, now = Date.now()) {
     return out;
 }
 
-module.exports = { createCreditsReader, daily };
+module.exports = { createBalanceReader, daily };
