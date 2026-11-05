@@ -8,6 +8,9 @@
  *                                                                              source app-<app ulid>)
  *   media    upload one small file (sandbox)   needs media.object.upload    (audience openvibe.media,
  *                                                                              namespace = project id)
+  *   ai       one chat reply (AI Exchange P8)   needs ai.app.run               (audience openvibe.ai; POST /v1/chat/completions,
+ *                                                                              not streamed; behind SERVICES_AI_PLAYGROUND). The prompt
+ *                                                                              and the reply are shown once and never stored.
  *
  * The order is fixed and every step can refuse:
  *   1. app     the app (as Network reports it to the signed-in member) is active and is a SANDBOX app
@@ -36,7 +39,21 @@ const KINDS = {
     // `needs`: the capability the APP must hold (owned by Events / Media; Services guards nothing with it).
     events: { needs: 'events.app.publish', audience: 'openvibe.events', label: 'Events: publish a test event' },
     media: { needs: 'media.object.upload', audience: 'openvibe.media', label: 'Media: upload a file to the sandbox' },
+    // ai.app.run: the public capability developer apps already call AI with (ADR-014; AI Exchange D8').
+    ai: { needs: 'ai.app.run', audience: 'openvibe.ai', label: 'AI: one chat reply' },
 };
+const MODEL_ID = /^[A-Za-z0-9._:/@-]{1,160}$/;
+
+/** The AI playground's input: a model (an exact id or a dynamic name), a prompt, a reply cap. → { body } | { error } */
+function aiInput(input) {
+    const model = String(input.model || 'openvibe').trim();
+    if (!MODEL_ID.test(model)) return { error: 'the model is an exact id (org/model[:quant]@revision) or a dynamic name (openvibe/auto …)' };
+    const prompt = String(input.prompt || '').trim();
+    if (!prompt) return { error: 'write a prompt' };
+    if (prompt.length > 4000) return { error: 'the prompt is at most 4,000 characters here' };
+    const max = Math.max(1, Math.min(1024, Math.floor(Number(input.max_tokens) || 256)));
+    return { body: { model, messages: [{ role: 'user', content: prompt }], max_tokens: max, stream: false } };
+}
 
 function scrub(text, secrets) {
     let s = String(text || '').slice(0, 500);
@@ -84,6 +101,7 @@ function createPlayground({ store, config, network, keys, fetchImpl, log = conso
     function precheck(app, kind) {
         const k = KINDS[kind];
         if (!k) return { ok: false, stage: 'input', code: 'playground.unknown', detail: 'no such playground' };
+        if (kind === 'ai' && !config.playground.ai) return { ok: false, stage: 'input', code: 'playground.unknown', detail: 'the AI playground is not open yet' };
         if (app.revoked_at) return { ok: false, stage: 'app', code: 'playground.app_revoked', detail: 'this app is revoked in Network' };
         if (app.environment !== 'sandbox') return { ok: false, stage: 'app', code: 'playground.production_app', detail: 'playgrounds run only sandbox apps; create a sandbox app in this project to try things out' };
         const grants = Array.isArray(app.grants) ? app.grants : [];
@@ -173,7 +191,12 @@ function createPlayground({ store, config, network, keys, fetchImpl, log = conso
         if (!pre.ok) return { ...await finish({ outcome: 'refused', stage: pre.stage, code: pre.code, detail: pre.detail }), missing: pre.missing, grantable: pre.grantable };
 
         let envelope = null;
-        if (kind === 'events') {
+        let aiBody = null;
+        if (kind === 'ai') {
+            const a = aiInput(input);
+            if (a.error) return await finish({ outcome: 'refused', stage: 'input', code: 'playground.invalid_input', detail: a.error });
+            aiBody = a.body;
+        } else if (kind === 'events') {
             const e = eventInput({ ...input, appId: app.id, projectId: app.project_id });
             if (e.error) return await finish({ outcome: 'refused', stage: 'input', code: 'playground.invalid_input', detail: e.error });
             envelope = e.envelope;
@@ -188,6 +211,30 @@ function createPlayground({ store, config, network, keys, fetchImpl, log = conso
         base.credential = credential.type;
         const tok = await appToken(app, k, credential);
         if (!tok.ok) return await finish({ outcome: 'refused', stage: 'token', code: tok.code, detail: tok.detail, http_status: tok.http_status });
+
+        if (kind === 'ai') {
+            // The prompt and the reply are returned to this page once; the run log keeps only the outcome and ids.
+            secrets.push(aiBody.messages[0].content);
+            let res; let doc = null;
+            try {
+                res = await (fetchImpl || globalThis.fetch)(`${config.playground.aiUrl}/v1/chat/completions`, {
+                    method: 'POST', headers: { Authorization: `Bearer ${tok.token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify(aiBody), signal: AbortSignal.timeout(60_000),
+                });
+                doc = await res.json().catch(() => null);
+            } catch (err) {
+                return await finish({ outcome: 'failed', stage: 'call', code: 'playground.ai_unreachable', detail: 'OpenVibe AI did not answer' });
+            }
+            if (!res.ok || !doc) {
+                const code = (doc && (doc.code || (doc.error && (doc.error.code || doc.error.type)))) || 'playground.ai_error';
+                const detail = (doc && (doc.detail || (doc.error && doc.error.message))) || `OpenVibe AI answered ${res.status}`;
+                return await finish({ outcome: 'failed', stage: 'call', http_status: res.status, code: String(code).slice(0, 80), detail: `OpenVibe AI answered ${res.status}: ${String(detail).slice(0, 300)}` });
+            }
+            const choice = Array.isArray(doc.choices) && doc.choices[0] ? doc.choices[0] : {};
+            const reply = String((choice.message && choice.message.content) || '').slice(0, 8000);
+            const out = await finish({ outcome: 'ok', stage: 'done', http_status: res.status, detail: `answered by ${String(doc.model || aiBody.model).slice(0, 160)}`, ref: doc.id ? String(doc.id).slice(0, 120) : null });
+            return { ...out, result: { model: doc.model || aiBody.model, reply, finish_reason: choice.finish_reason || null, usage: doc.usage || null, openvibe: doc.x_openvibe || null } };
+        }
 
         const client = sdkClient(tok.token);
         try {
@@ -214,4 +261,4 @@ function createPlayground({ store, config, network, keys, fetchImpl, log = conso
     return { run, precheck, runsFor, runsForProject, deleteRunsForProject, grantAdvice, KINDS, projectKey, appSource };
 }
 
-module.exports = { createPlayground, KINDS, grantAdvice, scrub, projectKey, appSource };
+module.exports = { createPlayground, KINDS, grantAdvice, scrub, projectKey, appSource, aiInput };

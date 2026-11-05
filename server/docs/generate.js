@@ -128,15 +128,25 @@ function sdkModules() {
 function generate({ now = () => Date.now() } = {}) {
     const deprecations = new Map((contractsRegistry.deprecations || []).map((d) => [d.id, d]));
     const byDollarId = new Map();
+    // A contract may have several majors in the catalog (ai.credential-put@1 and @2): each gets its own page. The
+    // latest major is /docs/contracts/<id>; an older one is /docs/contracts/<id>@<major>. The fixtures that ship
+    // with the package are the latest major's, so only its page shows them.
+    const majorOf = (entry) => Number(String(entry.version).split('.')[0]);
+    const latestMajor = new Map();
+    for (const entry of contracts.catalog) latestMajor.set(entry.id, Math.max(latestMajor.get(entry.id) || 0, majorOf(entry)));
     const contractList = contracts.catalog.map((entry) => {
-        const schema = contracts.schema(entry.id);
-        byDollarId.set(schema.$id, entry.id);
-        const fixtures = {
+        const major = majorOf(entry);
+        const latest = major === latestMajor.get(entry.id);
+        const schema = contracts.schema(`${entry.id}@${major}`);
+        const ref = latest ? entry.id : `${entry.id}@${major}`;
+        byDollarId.set(schema.$id, ref);
+        const fixtures = latest ? {
             valid: readJsonDir(path.join(CONTRACTS_ROOT, 'fixtures', entry.id, 'valid')),
             invalid: readJsonDir(path.join(CONTRACTS_ROOT, 'fixtures', entry.id, 'invalid')),
-        };
+        } : { valid: [], invalid: [] };
         return {
-            ...entry, $id: schema.$id, title: schema.title || entry.id, description: schema.description || '', schema,
+            ...entry, major, latest, ref, href: `/docs/contracts/${ref}`, latestMajor: latestMajor.get(entry.id),
+            $id: schema.$id, title: schema.title || entry.id, description: schema.description || '', schema,
             fields: fieldRows(schema, schema.$id), fixtures, deprecation: deprecations.get(entry.id) || null,
         };
     });
@@ -175,7 +185,8 @@ function generate({ now = () => Date.now() } = {}) {
         sdkLicense: sdkPkg.license,
         sdkContractsRange: (() => { try { return require('openvibe-sdk/core').CONTRACTS_RANGE; } catch { return null; } })(),
         contracts: contractList,
-        contract: (id) => contractList.find((c) => c.id === id) || null,
+        // The latest major of an id, or the named major (`contract('ai.credential-put', 1)`).
+        contract: (id, major) => contractList.find((c) => c.id === id && (major == null ? c.latest : c.major === Number(major))) || null,
         capabilities,
         capability: (id) => capabilities.find((c) => c.id === id) || null,
         services: contracts.services.manifests,

@@ -51,6 +51,8 @@ const PAGE_TEXT = {
     '/docs/events': ['Event types', 'Every event type a service manifest declares it produces or consumes.'],
     '/docs/services': ['Service registry', 'The Network\'s registry as it answers, with health (never invented).'],
     '/docs/billing': ['Billing policy', 'The billing policy as OpenVibe.Billing\'s /policy.json states it.'],
+    '/docs/vibes': ['Vibes and Vibes Pay', 'What Vibes are and how an app sells something with Vibes Pay: the SDK, plain HTTP, webhooks, sandbox, refunds, payouts and limits.'],
+    '/docs/balance': ['Balance', 'How metered usage bills a project\'s Balance, adding money and moving money to a project.'],
     '/docs/limits': ['Limits and tiers', 'What a project may do in sandbox and production, from the services that enforce it.'],
     '/docs/tools': ['Tools API', 'The OpenVibe.Tools registry, callable from code.'],
     '/docs/export': ['Project export', 'What a project export holds: the metadata JSON and the full archive.'],
@@ -107,6 +109,8 @@ function publicPages({ docs }) {
         { path: '/docs/events', changefreq: 'weekly', priority: 0.6 },
         { path: '/docs/services', changefreq: 'weekly', priority: 0.6 },
         { path: '/docs/billing', changefreq: 'monthly', priority: 0.5 },
+        { path: '/docs/vibes', changefreq: 'monthly', priority: 0.6 },
+        { path: '/docs/balance', changefreq: 'monthly', priority: 0.6 },
         { path: '/docs/limits', changefreq: 'monthly', priority: 0.5 },
         { path: '/docs/tools', changefreq: 'monthly', priority: 0.5 },
         { path: '/docs/export', changefreq: 'monthly', priority: 0.5 },
@@ -121,7 +125,7 @@ function publicPages({ docs }) {
         { path: '/policy/licensing', changefreq: 'monthly', priority: 0.4 },
         { path: '/policy/transparency', changefreq: 'monthly', priority: 0.4 },
     ];
-    for (const c of docs.contracts) pages.push({ path: `/docs/contracts/${c.id}`, changefreq: 'monthly', priority: 0.4 });
+    for (const c of docs.contracts) pages.push({ path: c.href, changefreq: 'monthly', priority: c.latest ? 0.4 : 0.2 });
     for (const c of docs.capabilities) pages.push({ path: `/docs/capabilities/${c.id}`, changefreq: 'monthly', priority: 0.4 });
     for (const x of contracts.openapi.index()) pages.push({ path: `/docs/api/${x.service}`, changefreq: 'monthly', priority: 0.4 });
     for (const m of docs.sdk) pages.push({ path: `/docs/sdk/${m.slug}`, changefreq: 'monthly', priority: 0.3 });
@@ -139,8 +143,8 @@ function describePage(pathname, { docs, apiIndex = [] }) {
     if (PAGE_TEXT[pathname]) return { title: PAGE_TEXT[pathname][0], text: PAGE_TEXT[pathname][1] };
     let m;
     if ((m = /^\/docs\/contracts\/([^/]+)$/.exec(pathname))) {
-        const c = docs.contracts.find((x) => x.id === m[1]);
-        if (c) return { title: c.title, text: seo.clip(c.description, 200) };
+        const c = docs.contracts.find((x) => x.ref === m[1]);
+        if (c) return { title: c.latest ? c.title : `${c.title} (${c.id}@${c.major})`, text: seo.clip(c.description, 200) };
     }
     if ((m = /^\/docs\/capabilities\/([^/]+)$/.exec(pathname))) {
         const c = docs.capabilities.find((x) => x.id === m[1]);

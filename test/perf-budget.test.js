@@ -44,7 +44,8 @@ const freePort = () => new Promise((resolve) => { const s = net.createServer(); 
     const base = `http://127.0.0.1:${port}`;
     try {
         let up = false;
-        for (let i = 0; i < 150 && !up; i++) {
+        // 45 s, not 15: the shared host's PGlite boot (now including the D11 config tables) can take that long under load.
+        for (let i = 0; i < 450 && !up; i++) {
             up = await fetch(`${base}/api/health`).then((r) => r.ok).catch(() => false);
             if (!up) await new Promise((r) => setTimeout(r, 100));
         }

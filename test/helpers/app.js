@@ -55,7 +55,7 @@ async function boot(opts = {}) {
     const authorities = opts.registry || registryOf(stubs);
     const store = opts.db ? { db: opts.db, store: opts.db.store, close: async () => {} } : await testDb({ store: opts.store });
     const { createStore } = require('../../server/db');
-    const built = await createApp({ config, store: createStore(store.db), authorities, log, actorLimits: false, ...(opts.appOpts || {}) });
+    const built = await createApp({ config, store: createStore(store.db), authorities, log, actorLimits: false, env, ...(opts.appOpts || {}) });
     const app = built.app;
     Object.assign(app.locals, built.ctx);
     await built.ctx.keys.ensure();

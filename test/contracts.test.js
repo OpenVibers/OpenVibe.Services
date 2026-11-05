@@ -15,6 +15,7 @@ const { RESOURCE_READ } = require('../server/registry/resource-index');
 const { check, done } = require('./helpers/boot');
 
 const CONTROL = 'services.resource.control';
+const CONFIG = 'services.config.manage';
 
 (async () => {
     const manifest = contracts.services.get('services');
@@ -35,7 +36,7 @@ const CONTROL = 'services.resource.control';
         // Contracts 0.164 also lists three planned capabilities (recipe run, usage and cost reads): declared, not served
         // or guarded yet, so they stay planned here.
         const PLANNED = ['services.recipe.run', 'services.usage.read', 'services.cost.read'];
-        assert.deepStrictEqual([...manifest.capabilities].sort(), [MANAGE, READ, RESOURCE_READ, CONTROL, ...PLANNED].sort());
+        assert.deepStrictEqual([...manifest.capabilities].sort(), [MANAGE, READ, RESOURCE_READ, CONTROL, CONFIG, ...PLANNED].sort());
         for (const id of PLANNED) assert.strictEqual(contracts.capabilities.get(id).status, 'planned', `${id} is not guarded by this code`);
         for (const id of [MANAGE, READ]) {
             const c = contracts.capabilities.get(id);
@@ -43,6 +44,13 @@ const CONTROL = 'services.resource.control';
             assert.strictEqual(c.owner, 'services');
             assert.strictEqual(c.status, 'active');
         }
+        // services.config.manage (D11) guards /internal/config; it is internal, so only Network's token may hold it.
+        const configCap = contracts.capabilities.get(CONFIG);
+        assert.ok(configCap, CONFIG);
+        assert.strictEqual(configCap.owner, 'services');
+        assert.strictEqual(configCap.status, 'active');
+        assert.strictEqual(configCap.visibility, 'internal');
+        assert.match(fs.readFileSync(path.join(__dirname, '..', 'server', 'ai-config.js'), 'utf8'), /services\.config\.manage/);
         const resource = contracts.capabilities.get(RESOURCE_READ);
         assert.ok(resource, RESOURCE_READ);
         assert.strictEqual(resource.owner, 'services');

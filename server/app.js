@@ -57,6 +57,7 @@ const { createApi } = require('./http/api');
 const openapi = require('./http/openapi');
 const { createServicesReadiness, registerServicesGauges } = require('./observability');
 const { createActorLimits } = require('./http/actor-limits');
+const createAiConfig = require('./ai-config').create;
 const { createIndexNow } = require('openvibe-shared/indexnow');
 const { assetVersion, send } = require('./render/layout');
 const { html } = require('./render/html');
@@ -112,7 +113,12 @@ async function createApp(opts = {}) {
     const confirmations = opts.confirmations || createConfirmations(config, { tokens, fetchImpl: fetchImpl || globalThis.fetch });
     const control = createControl({ store, index, confirmations, log });
 
-    const ctx = { config, store, docs, keys, sso, network, outbox, trust, releases, playground, archiver, limits, indexnow, authorities, tokens, index, apiAuth, control, log };
+    // D11 owner settings (services.ai): the AI Exchange switches read through the store, env pins winning.
+    const aiConfig = await createAiConfig({ db: store.db, keys, config, env: opts.env || process.env, log });
+    Object.defineProperty(config, 'modelExplorer', { enumerable: true, configurable: true, get: () => aiConfig.get('model_explorer') });
+    Object.defineProperty(config, 'modelCatalogSource', { enumerable: true, configurable: true, get: () => aiConfig.get('model_catalog_source') });
+    if (config.playground) Object.defineProperty(config.playground, 'ai', { enumerable: true, configurable: true, get: () => aiConfig.get('ai_playground') });
+    const ctx = { config, store, docs, keys, sso, network, outbox, trust, releases, playground, archiver, limits, indexnow, authorities, tokens, index, apiAuth, control, log, aiConfig };
 
     const app = express();
     app.disable('x-powered-by');
@@ -158,6 +164,9 @@ async function createApp(opts = {}) {
         referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     }));
     app.use(cookieParser());
+
+    // ── D11 owner settings: /internal/config (loopback only; services.config.manage, Network's token) ──
+    aiConfig.mount(app);
 
     // ── OpenVibe.Events → Services (loopback only: nginx answers 404 for /internal/) ──
     // network.account.export_requested and network.account.deleted (ADR-033), answered by openvibe-sdk/account-data's
@@ -260,6 +269,10 @@ async function createApp(opts = {}) {
     app.use('/projects', rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false, skip: (req) => req.method === 'GET' }), createPortalRoutes(ctx));
     app.use('/releases', createReleaseActionRoutes(ctx));
     app.use(createToolRoutes(ctx));
+    // The model explorer (AI Exchange P8, /models): behind SERVICES_MODEL_EXPLORER, off until the catalog is live.
+    app.use(require('./http/models').createModelRoutes(ctx));
+    app.use(require('./http/ai-docs').createAiDocsRoutes(ctx));
+    app.use(require('./http/money-docs').createMoneyDocsRoutes(ctx));
     app.use(createPageRoutes(ctx));
     app.use((req, res) => send(res, 404, { viewer: req.viewer, config, path: req.originalUrl, title: 'Not found', body: html`<h1>Not found</h1><p>No page here. Try the <a href="/docs">docs</a> or <a href="/projects">your projects</a>.</p>` }));
 
