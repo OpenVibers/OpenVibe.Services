@@ -18,7 +18,7 @@ const BUDGETS = {
     jsRawKB: 375.1, // 375.1: measured 367.1 with openvibe-shared 4.161.0, plus room for 4.162.0–4.163.0, 2026-11-09
     jsBrotliKB: 89.5, // 89.5: measured 87.5 with openvibe-shared 4.163.0, plus room for 4.162.0–4.163.0, 2026-11-09
     cssFiles: 3,   // 3 with kit.css (2026-10-29: the home's numbers strip, folds and examples list); 2; 1
-    cssRawKB: 87.9, // 87.9: measured 82.9 with openvibe-shared 4.161.0, plus room for 4.162.0–4.163.0, 2026-11-09
+    cssRawKB: 88.6, // 88.6: measured 88.2 with openvibe-shared 4.172.0 (the paste form's segmented control, the page head), 2026-11-09
     cssBrotliKB: 18.3, // 18.3: measured 17.1 with openvibe-shared 4.161.0, plus room for 4.162.0–4.163.0, 2026-11-09
     externalFiles: 2,   // 0
 };
