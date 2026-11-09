@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use OpenVibe.Services in research or a product, cite it as below."
+title: openvibe-services
+type: software
+authors:
+  - name: OpenVibe
+    alias: OpenVibers
+    website: https://openvibe.network
+repository-code: https://github.com/OpenVibers/OpenVibe.Services
+url: https://openvibe.services
+license: AGPL-3.0-only
+abstract: "The developer home for every OpenVibe API, the SDK, keys and examples, at openvibe.services."
+keywords:
+  - openvibe
+  - api
+  - developer-portal
+  - documentation
+  - openapi
