@@ -2,6 +2,9 @@
 
 > The developer platform of the OpenVibe network: one console for projects and apps over OpenVibe.Network, scoped credentials, capability grants, usage and project export; app and mod releases; API, contract, SDK and event reference generated from what production runs; OAuth and webhook tools; and one resource index over every service.
 
+**Live site:** https://openvibe.services · **API docs:** https://openvibe.services · **For AI:** https://openvibe.services/llms.txt
+**Run it:** `npm ci && npm run dev` (Node 22 or newer) · **Tests:** `npm test`
+
 **Status:** alpha. Serves `https://openvibe.services` (openvibe-ovh, unit `openvibe-services` on 127.0.0.1:4930 behind nginx). The developer portal moved here from OpenVibe.Codes on 2026-10-08 (owner decision: Codes became the open coding-agent harness); its production data then was nil (0 manifests, 0 releases, 0 playground runs), so nothing was copied, and openvibe.codes answers its old portal paths with permanent redirects to the same paths here. Tests run against in-process stand-ins for Network, Events and Media. See [STATUS.json](STATUS.json) for exactly what works and what does not.
 **Domain:** `openvibe.services` · **Port:** 4930 · **Service id:** `services`
 **Plan:** plan T13 (the developer platform and the resource control plane); binding decisions ADR-014 (the portal over Network's projects API) and ADR-048 (the control plane) in OpenVibe.Contracts.
