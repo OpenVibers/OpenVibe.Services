@@ -276,7 +276,9 @@ function createDiscoveryRoutes(ctx) {
             site: SITE_NAME,
             summary: 'Every fixed public page of OpenVibe.Services, one line each: the home and update log, the reference generated from the pinned contracts and SDK, the developer tools, and the policy pages.',
             base: site,
-            maxBytes: 512 * 1024,
+            // The pinned contracts reference (every contract, capability, API and SDK page) grows with each
+            // pin; 512 KB started cutting the fixed Playgrounds/Site pages off the tail at contracts 0.406.0.
+            maxBytes: 640 * 1024,
             sections: [
                 { title: 'Home', pages: group((p) => p === '/') },
                 { title: 'Reference', pages: group(isDocs) },
