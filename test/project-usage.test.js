@@ -116,7 +116,7 @@ function usageFor(projectId) {
         // Works without JavaScript: the range is a GET form; nothing here needs a script of Services'.
         assert.match(body, new RegExp(`<form method="get" action="/projects/${projectId}/usage"`));
         assert.ok(!/src="\/js\//.test(body), 'no Services script on the page');
-        assert.ok(!/\bfree\b|\$0/i.test(body), 'never "free" or "$0"');
+        assert.ok(!/\bfree\b(?!\s+tools)|\$0/i.test(body), 'never "free" or "$0" (the shared footer\'s "Free tools" group is a place, not a price)');
     });
 
     await check('the range filters reach Network as offered; anything else falls back to 30 days, both environments', async () => {
