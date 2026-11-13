@@ -82,7 +82,8 @@ const { boot, check, done } = require('./helpers/boot');
             assert.match(launcher, /<ul class="sc-apps(?: sc-apps--c\d)?">/, 'the building blocks are a launcher');   // openvibe-shared 4.48.0 sets three columns for a count of 3n
             for (const b of home.BLOCKS) assert.ok(launcher.includes(`<a href="${b.href}">`) && launcher.includes(`<b>${b.name}</b>`), `the ${b.name} block`);
             const apis = require('openvibe-contracts').openapi.index().length;
-            assert.ok(launcher.includes(`<p class="sc-apps-more"><a href="/docs/api">See all ${apis} service APIs →</a></p>`), 'See all opens every service\'s API reference');
+            // openvibe-shared 4.241.0 draws the arrow (Design rule 169: no text arrows), so the label ends in its glyph.
+            assert.ok(launcher.includes(`<p class="sc-apps-more"><a href="/docs/api">See all ${apis} service APIs <span class="sc-go" aria-hidden="true"><svg`), 'See all opens every service\'s API reference');
             assert.ok(launcher.includes('<a href="https://openvibe.chat/vibe">Chat with Vibe</a>'), 'people are sent to Vibe');
             assert.ok(!/per_minute|\d bytes</.test(r.text), 'limits read in plain units');
             assert.ok(/\/shared\/kit\.css\?v=/.test(r.text) && !/\/shared\/kit-web\.js/.test(r.text) && !/kit-data/.test(r.text), 'kit.css for the strip, folds and list; no kit-web.js or Kit 2');
