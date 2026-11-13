@@ -96,8 +96,8 @@ function createMoneyDocsRoutes(appCtx) {
   <h2 id="http-h">Plain HTTP</h2>
   <p>Everything the SDK does is these three requests. The app token carries <code>billing.vibes.charge</code>; the
   person's token is not used by your server.</p>
-  ${block('Create a charge', `POST ${BILLING}/api/v1/vibes/charges\nAuthorization: Bearer $OPENVIBE_APP_TOKEN\nContent-Type: application/json\nIdempotency-Key: order_123\n\n{\n  "amount": 50,\n  "description": "Sticker pack: Neon cats",\n  "reference": "order_123",\n  "return_url": "https://myapp.example/thanks"\n}\n\n→ 201\n{ "id": "vch_…", "pay_url": "${PAY}/vch_…", "status": "pending", "expires_at": "…" }`)}
-  ${block('Read a charge', `GET ${BILLING}/api/v1/vibes/charges/vch_…\nAuthorization: Bearer $OPENVIBE_APP_TOKEN\n\n→ 200 { "id": "vch_…", "amount": 50, "status": "paid", "reference": "order_123", … }`)}
+  ${block('Create a charge', `POST ${BILLING}/api/v1/vibes/charges\nAuthorization: Bearer $OPENVIBE_APP_TOKEN\nContent-Type: application/json\nIdempotency-Key: order_123\n\n{\n  "amount": 50,\n  "description": "Sticker pack: Neon cats",\n  "reference": "order_123",\n  "return_url": "https://myapp.example/thanks"\n}\n\n# returns 201\n{ "id": "vch_…", "pay_url": "${PAY}/vch_…", "status": "pending", "expires_at": "…" }`)}
+  ${block('Read a charge', `GET ${BILLING}/api/v1/vibes/charges/vch_…\nAuthorization: Bearer $OPENVIBE_APP_TOKEN\n\n# returns 200 { "id": "vch_…", "amount": 50, "status": "paid", "reference": "order_123", … }`)}
   ${block('Refund a charge', `POST ${BILLING}/api/v1/vibes/charges/vch_…/refund\nAuthorization: Bearer $OPENVIBE_APP_TOKEN\nContent-Type: application/json\n\n{ "reason": "requested by the buyer" }`)}
   <p>The <code>reference</code> is the idempotency key. The same reference with the same request is the same charge;
   changing the request under it is refused, never charged twice. A create whose answer was lost can be retried
@@ -214,7 +214,7 @@ function createMoneyDocsRoutes(appCtx) {
 <section class="mx-card" id="read" aria-labelledby="read-h">
   <h2 id="read-h">Read it</h2>
   <p>With the person's Network user token, Billing answers their Balance and the projects they administer:</p>
-  ${block('GET /api/me/balance', `GET ${BILLING}/api/me/balance\nAuthorization: Bearer <the person's token>\n\n→ 200 {\n  "personal": { "balance_nano_usd": "12400000000", "held_nano_usd": "0", "available_nano_usd": "12400000000" },\n  "projects": [ { "owner": { "type": "project", "id": "prj_…" }, "balance_nano_usd": "…", … } ]\n}`)}
+  ${block('GET /api/me/balance', `GET ${BILLING}/api/me/balance\nAuthorization: Bearer <the person's token>\n\n# returns 200 {\n  "personal": { "balance_nano_usd": "12400000000", "held_nano_usd": "0", "available_nano_usd": "12400000000" },\n  "projects": [ { "owner": { "type": "project", "id": "prj_…" }, "balance_nano_usd": "…", … } ]\n}`)}
   <p>A project's statement (its Balance, held and available, and its recent charges) is the same read scoped to the
   project, with <code>project_id</code>; only an admin or owner of the project may see it. Everything is a decimal
   string of integer nano-USD: parse it as a BigInt, never as a float.</p>
@@ -230,9 +230,9 @@ function createMoneyDocsRoutes(appCtx) {
 
 <section class="mx-card" id="move" aria-labelledby="move-h">
   <h2 id="move-h">Move money to a project</h2>
-  <p>Your Balance → a project's Balance is a transfer. It is atomic and idempotent, and it can never spend money a
+  <p>Your Balance to a project's Balance is a transfer. It is atomic and idempotent, and it can never spend money a
   running request is holding. Use <b>Move to a project</b> in the wallet, or the API:</p>
-  ${block('POST /api/me/balance/transfers', `POST ${BILLING}/api/me/balance/transfers\nAuthorization: Bearer <the person's token>\nContent-Type: application/json\n\n{\n  "to_project_id": "prj_…",\n  "amount_nano_usd": "5000000000",\n  "idempotency_key": "move-2026-11-04-1"\n}\n\n→ 201 { "transfer": { … }, "from": { … }, "to": { … } }`)}
+  ${block('POST /api/me/balance/transfers', `POST ${BILLING}/api/me/balance/transfers\nAuthorization: Bearer <the person's token>\nContent-Type: application/json\n\n{\n  "to_project_id": "prj_…",\n  "amount_nano_usd": "5000000000",\n  "idempotency_key": "move-2026-11-04-1"\n}\n\n# returns 201 { "transfer": { … }, "from": { … }, "to": { … } }`)}
   <p><code>amount_nano_usd</code> is a positive integer string: 5,000,000,000 is $5.00. The same idempotency key
   with the same request replays the first answer; the same key with a different request is refused. Moving money
   the other way — a project's Balance to a person — is not a top-up or a withdrawal; it is a refund or a payout under

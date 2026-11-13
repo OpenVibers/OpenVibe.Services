@@ -313,7 +313,7 @@ ${apiDocs.has(c.owner) ? html`<p><a href="/docs/api/${c.owner}#cap-${c.id}">Thes
 <p>OpenVibe.Blog watches every running service's release: the <code>release</code> in its <code>/release.json</code>, as OpenVibe.Network's registry reports it. When a release changes, GitHub's compare of the old and new commit gives the commits that shipped. Each one becomes an entry, with the commit message as its text, and batches of them are published as "Patch notes" posts. A service appears once it serves <code>/release.json</code> and its registry entry names its repository.</p>
 <h2>The feed</h2>
 <pre tabindex="0"><code>GET https://openvibe.network/api/v1/changelog?service=&lt;id&gt;&amp;limit=&lt;1-100&gt;&amp;before=&lt;cursor&gt;
-→ { service, entries: [{ service, sha, short, subject, author, committed_at, deployed_at, major, url, post_id }],
+# returns { service, entries: [{ service, sha, short, subject, author, committed_at, deployed_at, major, url, post_id }],
     latest_post: { id, title, url, published_at, entries } | null, posts, next }</code></pre>
 <p>It is public, CORS <code>*</code> and cached for 60 s (stale while the blog is down). Leave <code>service</code> out for the whole network.</p>
 ${sample ? html`<details open><summary>Live sample: the last ${String((sample.entries || []).length)} entries for this site</summary><ul>${(sample.entries || []).map((e) => html`<li><a href="${e.url}"><code>${e.short}</code></a> ${e.subject} ${e.deployed_at ? html`<span class="muted small">(${time(e.deployed_at)})</span>` : ''}</li>`)}</ul></details>`

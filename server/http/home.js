@@ -133,7 +133,7 @@ const file = await media.upload(bytes, { filename: 'logo.png', contentType: 'ima
   -d grant_type=client_credentials \\
   -d client_id="$OV_CLIENT_ID" -d client_secret="$OV_CLIENT_SECRET" \\
   -d audience=openvibe.media
-# → {"access_token":"…","token_type":"Bearer","expires_in":300,…}`;
+# returns {"access_token":"…","token_type":"Bearer","expires_in":300,…}`;
     const template = `npx --package=https://codeload.github.com/OpenVibers/OpenVibe.Examples/tar.gz/refs/tags/v0.3.0 \\
     create-openvibe-app my-app --template web`;
     return `<section class="sc-sec" id="quick-start" aria-labelledby="h-quick-start"><h2 id="h-quick-start">Quick start</h2>
