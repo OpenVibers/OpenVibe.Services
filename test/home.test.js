@@ -91,7 +91,7 @@ const { boot, check, done } = require('./helpers/boot');
             const blocks = [...r.text.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
             const faq = blocks.find((b) => b['@type'] === 'FAQPage');
             assert.ok(faq && faq.mainEntity.length === home.FAQ.length, 'a FAQPage node with every question');
-            faq.mainEntity.forEach((q) => assert.ok(r.text.includes(`<summary>${q.name.replace(/'/g, '&#39;')}</summary>`), `the page shows "${q.name}"`));
+            faq.mainEntity.forEach((q) => assert.ok((r.text.includes(`<span>${q.name.replace(/'/g, '&#39;')}</span></summary>`) || r.text.includes(`<summary>${q.name.replace(/'/g, '&#39;')}</summary>`)), `the page shows "${q.name}"`));
             assert.strictEqual((r.text.match(/<h1[\s>]/g) || []).length, 1, 'one h1');
             assert.strictEqual((r.text.match(/<section[\s>]/g) || []).length, (r.text.match(/<\/section>/g) || []).length, 'every section is closed once');
 
