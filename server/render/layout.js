@@ -25,13 +25,13 @@ const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 // The product's own places: the main ones carry an icon (phones get them as the bottom tab bar), the rest fold into
 // the navbar's More (Shared 4.22). Search is the navbar's magnifier and What shipped is the footer's.
 const NAV = [
-    { label: 'Projects', href: '/projects', icon: 'fa-diagram-project' },
-    { label: 'Docs', href: '/docs', icon: 'fa-book' },
-    { label: 'OAuth', href: '/oauth', icon: 'fa-key' },
-    { label: 'Webhooks', href: '/tools/webhooks', icon: 'fa-plug' },
-    { label: 'Mod', href: '/mod', icon: 'fa-shield-halved', more: true },
-    { label: 'Manifests', href: '/manifests/validate', icon: 'fa-file-lines', more: true },
-    { label: 'Policy', href: '/policy', icon: 'fa-shield-halved', more: true },
+    { label: 'Projects', href: '/projects', icon: 'nodes' },
+    { label: 'Docs', href: '/docs', icon: 'book' },
+    { label: 'OAuth', href: '/oauth', icon: 'key' },
+    { label: 'Webhooks', href: '/tools/webhooks', icon: 'plug' },
+    { label: 'Mod', href: '/mod', icon: 'shield', more: true },
+    { label: 'Manifests', href: '/manifests/validate', icon: 'file', more: true },
+    { label: 'Policy', href: '/policy', icon: 'shield', more: true },
 ];
 
 const hashes = new Map();
@@ -75,7 +75,7 @@ function renderPage(o) {
     };
     // This site's own account links live in the shared navbar's account menu (the page's account
     // bar below is only for visitors without JavaScript).
-    if (signedIn) nav.menu = { before: [...(viewer.staff ? [{ label: 'Staff', href: '/staff', icon: 'fa-shield' }] : []), { label: 'Your projects', href: '/projects', icon: 'fa-folder' }] };
+    if (signedIn) nav.menu = { before: [...(viewer.staff ? [{ label: 'Staff', href: '/staff', icon: 'shield' }] : []), { label: 'Your projects', href: '/projects', icon: 'folder' }] };
     const footer = { service: 'services', variant: 'auto', path: o.path, mount: '#ov-footer', brandName: SITE_NAME, updates: '/updates' };   // full on the front page only (Shared 4.19)
     const account = signedIn
         ? html`Signed in as <strong>${viewer.displayName || viewer.username || 'you'}</strong>${viewer.staff ? html` · <a href="/staff">Staff</a>` : ''} · <a href="/projects">Your projects</a> · <a href="/auth/logout?next=${loginNext}">Sign out</a>`
