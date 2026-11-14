@@ -49,8 +49,8 @@ async function main() {
     // queues requests in the kernel instead of answering 502. Without the socket unit, the usual listen.
     const socketActivated = process.env.LISTEN_FDS === '1' && Number(process.env.LISTEN_PID) === process.pid;
     const server = app.listen(...(socketActivated ? [{ fd: 3 }] : [config.port, config.host]), () => {
-        console.log(`[Services] ${config.nodeEnv} on http://${config.host}:${config.port} → ${config.baseUrl} (store ${db.store})`);
-        console.log(`[Services] docs from openvibe-contracts v${docs.contractsVersion} and openvibe-sdk v${docs.sdkVersion}; authorities ${authorities.size()}: ${authorities.ids().join(', ') || 'none'} (+ services in process); authority tokens ${tokens.enabled ? `client ${config.oauth.clientId}` : 'off (OV_OAUTH_CLIENT_SECRET unset: authorities are reported partial)'}; events relay ${outbox.enabled ? `on → ${config.events.url}` : 'off (events wait in services_events_outbox)'}`);
+        console.log(`[Services] ${config.nodeEnv} on http://${config.host}:${config.port} (public ${config.baseUrl}) (store ${db.store})`);
+        console.log(`[Services] docs from openvibe-contracts v${docs.contractsVersion} and openvibe-sdk v${docs.sdkVersion}; authorities ${authorities.size()}: ${authorities.ids().join(', ') || 'none'} (+ services in process); authority tokens ${tokens.enabled ? `client ${config.oauth.clientId}` : 'off (OV_OAUTH_CLIENT_SECRET unset: authorities are reported partial)'}; events relay ${outbox.enabled ? `on, sending to ${config.events.url}` : 'off (events wait in services_events_outbox)'}`);
     });
     server.keepAliveTimeout = 65_000;
     // Request telemetry (openvibe-sdk/service, plan T1): one aggregated sample per route template, method and status

@@ -29,7 +29,7 @@ function modPage({ examplesTag = 'v0.3.0' } = {}) {
     return html`<h1>Mod the network</h1>
 <p>OpenVibe is open source end to end, and every product has an API. These are the ways to change how it works for you, for your community, or for everyone, today.</p>
 <h2 id="today">Extend it today</h2>
-<ul class="cards">${TODAY.map((c) => html`<li><a href="${c.href}"><strong>${c.title}</strong></a><span>${c.text}</span><a class="muted" href="${c.href}">${c.link} →</a></li>`)}</ul>
+<ul class="cards">${TODAY.map((c) => html`<li><a href="${c.href}"><strong>${c.title}</strong></a><span>${c.text}</span><a class="muted" href="${c.href}">${c.link} <i data-ov-icon="arrow-right" aria-hidden="true"></i></a></li>`)}</ul>
 <h2 id="packaged">Packaged mods</h2>
 <p>A packaged mod changes a product from the inside: a game's rules, an overlay on a stream. It is described by a <strong>mod manifest</strong> (<code>mods.mod-manifest@1</code> in openvibe-contracts): its id, version, publisher, target runtime, the capabilities it asks for, its assets and its budget. Installing one gives it its own principal on OpenVibe.Network, granted only the capabilities that were approved, and revoking that grant stops it at once.</p>
 <ol class="steps">

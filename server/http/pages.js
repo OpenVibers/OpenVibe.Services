@@ -178,7 +178,7 @@ ${table(['Decision', 'Status'], docs.adrs.map((a) => [html`<a href="/docs/adr/${
             index: true, cache: PUBLIC_CACHE, title: 'Compatibility and deprecation', crumbs: [{ label: 'Policy', href: '/policy' }, { label: 'Compatibility' }],
             body: html`<h1>Compatibility and deprecation</h1>
 <p class="versions">This page renders two decisions exactly as published in <code>openvibe-contracts v${docs.contractsVersion}</code>, so it cannot say anything they do not.</p>
-<p>Current deprecations in that release: ${docs.contracts.filter((c) => c.deprecation).length ? html`<ul>${docs.contracts.filter((c) => c.deprecation).map((c) => html`<li><a href="/docs/contracts/${c.id}">${c.id}</a> → ${c.deprecation.replacement}, removed after ${c.deprecation.removeAfter}</li>`)}</ul>` : 'none.'}
+<p>Current deprecations in that release: ${docs.contracts.filter((c) => c.deprecation).length ? html`<ul>${docs.contracts.filter((c) => c.deprecation).map((c) => html`<li><a href="/docs/contracts/${c.id}">${c.id}</a> is replaced by ${c.deprecation.replacement}, removed after ${c.deprecation.removeAfter}</li>`)}</ul>` : 'none.'}
 Deprecated capabilities: ${docs.capabilities.filter((c) => c.status === 'deprecated').map((c) => c.id).join(', ') || 'none'}.</p>
 ${a2 ? html`<article class="prose">${raw(markdown(a2.markdown))}</article>` : notice('ADR-002 is not in this contracts release.', 'warn')}
 ${a16 ? html`<article class="prose">${raw(markdown(a16.markdown))}</article>` : notice('ADR-016 is not in this contracts release.', 'warn')}`,
@@ -273,7 +273,7 @@ ${table(['Version', 'Kind', 'Environment', 'Status', 'Published', 'Compatibility
                 html`<a href="/releases/${x.id}">${x.version}</a>`, x.kind, x.environment, statusBadge(x.status), time(x.published_at),
                 Object.entries(x.compatibility).map(([k, v]) => `${k} ${v}`).join('; '),
             ]), { empty: 'No public releases.' })}
-${hist.length ? html`<h2>Trust history</h2>${table(['When', 'Change', 'Note'], hist.map((h) => [time(h.set_at), `${h.from_tier} → ${h.to_tier}`, h.note]))}` : ''}`,
+${hist.length ? html`<h2>Trust history</h2>${table(['When', 'Change', 'Note'], hist.map((h) => [time(h.set_at), `from ${h.from_tier} to ${h.to_tier}`, h.note]))}` : ''}`,
         });
     });
 
