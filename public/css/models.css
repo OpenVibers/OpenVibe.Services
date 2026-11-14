@@ -205,3 +205,5 @@
 .ob-action .mx-copy { display: inline-flex; align-items: center; text-decoration: none; min-height: 40px; }
 @media (max-width: 640px) { .ob-step { grid-template-columns: 32px minmax(0, 1fr); gap: 10px; } .ob-n { width: 32px; height: 32px; } }
 a.mx-apply { display: inline-flex; align-items: center; text-decoration: none; }
+/* Design rule 201: the intro is one line on a computer, at most two on a phone. */
+@media (max-width: 640px) { .mx-lede { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; } }
