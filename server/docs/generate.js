@@ -22,7 +22,9 @@ const ownPkg = require('../../package.json');
 
 /** The git tag this release pins a package to (from package.json's tarball URL), or null. */
 function pinnedTag(dep) {
-    const m = String((ownPkg.dependencies || {})[dep] || '').match(/refs\/tags\/(v[0-9A-Za-z.-]+)$/);
+    // GitHub's tag tarball (…/refs/tags/vX.Y.Z) or our own forge's (…/archive/vX.Y.Z.tar.gz, the pin bot's default since 4.284.0).
+    const t = String((ownPkg.dependencies || {})[dep] || '').match(/refs\/tags\/(v[0-9A-Za-z.-]+)$|\/archive\/(v[0-9A-Za-z.-]+?)\.tar\.gz$/);
+    const m = t && [t[0], t[1] || t[2]];
     return m ? m[1] : null;
 }
 
