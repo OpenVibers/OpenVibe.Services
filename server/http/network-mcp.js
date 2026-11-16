@@ -24,7 +24,9 @@ const express = require('express');
 const pkg = require('../../package.json');
 
 const PROTOCOL_VERSION = '2025-06-18';
-const SUPPORTED_VERSIONS = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
+const SUPPORTED_VERSIONS = new Set(['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']);
+// MCP 2026-07-28 (stateless: the version and the method on every request, server/discover) beside the handshake era.
+const mcp = require('openvibe-sdk/mcp');
 const CACHE_MS = 60 * 60 * 1000;
 const CALL_TIMEOUT_MS = 15_000;
 const MAX_BODY = 256 * 1024;
@@ -231,18 +233,38 @@ function createNetworkMcp({ config, fetchImpl = globalThis.fetch, now = () => Da
         return error(id, -32602, 'Unknown tool');
     }
 
-    async function handleMessage(msg) {
+    const SERVER_INFO = { name: 'openvibe-network', title: 'The OpenVibe network', version: pkg.version };
+    /** A 2026-07-28 request: headers checked against the body, every result complete, the tool list cacheable. */
+    async function handleModern(msg, params, req) {
+        const bad = mcp.checkRequest({ header: (n) => req.get(n), method: msg.method, params });
+        if (bad) return { answer: { jsonrpc: '2.0', id: msg.id, error: bad.error }, status: bad.status };
+        if (msg.method === 'server/discover') {
+            return { answer: result(msg.id, mcp.discoverResult({ serverInfo: SERVER_INFO, capabilities: { tools: {} }, instructions: INSTRUCTIONS, versions: [...mcp.MODERN_VERSIONS, ...SUPPORTED_VERSIONS] })) };
+        }
+        // The same tools for everyone: a public list, kept an hour.
+        if (msg.method === 'tools/list') return { answer: result(msg.id, mcp.listResult('tools', TOOLS, { cacheScope: 'public', ttlMs: 3600000 })) };
+        if (msg.method === 'tools/call') {
+            const a = await callTool(msg.id, params);
+            if (a && a.result) a.result = mcp.complete(a.result);
+            return { answer: a };
+        }
+        const nf = mcp.methodNotFound(msg.method);
+        return { answer: { jsonrpc: '2.0', id: msg.id, error: nf.error }, status: nf.status };
+    }
+
+    async function handleMessage(msg, req) {
         if (!msg || typeof msg !== 'object' || Array.isArray(msg) || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') return error(null, -32600, 'Invalid Request');
         const hasId = Object.prototype.hasOwnProperty.call(msg, 'id');
         if (hasId && !validId(msg.id)) return error(null, -32600, 'Invalid Request');
         if (!hasId || msg.method.startsWith('notifications/')) return null;   // a notification has no answer
         const params = msg.params && typeof msg.params === 'object' && !Array.isArray(msg.params) ? msg.params : {};
+        if (req && mcp.requestVersion(params)) return handleModern(msg, params, req);
         switch (msg.method) {
             case 'initialize':
                 return result(msg.id, {
                     protocolVersion: SUPPORTED_VERSIONS.has(params.protocolVersion) ? params.protocolVersion : PROTOCOL_VERSION,
                     capabilities: { tools: { listChanged: false } },
-                    serverInfo: { name: 'openvibe-network', title: 'The OpenVibe network', version: pkg.version },
+                    serverInfo: SERVER_INFO,
                     instructions: INSTRUCTIONS,
                 });
             case 'ping': return result(msg.id, {});
@@ -258,7 +280,7 @@ function createNetworkMcp({ config, fetchImpl = globalThis.fetch, now = () => Da
     router.use('/mcp', (_req, res, next) => { res.setHeader('Access-Control-Allow-Origin', '*'); res.setHeader('Cache-Control', 'no-store'); next(); });
     router.options('/mcp', (_req, res) => {
         res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Mcp-Protocol-Version');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Mcp-Protocol-Version, Mcp-Method, Mcp-Name');
         res.setHeader('Access-Control-Max-Age', '600');
         res.status(204).end();
     });
@@ -266,17 +288,21 @@ function createNetworkMcp({ config, fetchImpl = globalThis.fetch, now = () => Da
     router.post('/mcp', json, async (req, res, next) => {
         try {
             const version = req.get('mcp-protocol-version');
-            if (version && !SUPPORTED_VERSIONS.has(version)) return res.status(400).json(error(null, -32600, 'Unsupported protocol version'));
+            // A 2026-07-28 version is checked against the body per request (handleModern); an unknown one is refused here.
+            if (version && !SUPPORTED_VERSIONS.has(version) && !mcp.MODERN_VERSIONS.includes(version)) return res.status(400).json(error(null, -32600, 'Unsupported protocol version'));
             const body = req.body;
             if (!body || typeof body !== 'object' || (Array.isArray(body) && !body.length)) return res.json(error(null, -32600, 'Invalid Request'));
             if (Array.isArray(body) && body.length > 20) return res.json(error(null, -32600, 'At most 20 messages in a batch'));
             const answers = [];
+            let status = 200;
             for (const msg of Array.isArray(body) ? body : [body]) {
-                const a = await handleMessage(msg);
+                const out = await handleMessage(msg, Array.isArray(body) ? null : req);
+                const a = out && out.answer !== undefined ? out.answer : out;
+                if (out && out.status && !Array.isArray(body)) status = out.status;   // 2026-07-28: a refusal is a 400, an unknown method a 404
                 if (a) answers.push(a);
             }
             if (!answers.length) return res.status(202).end();
-            return res.json(Array.isArray(body) ? answers : answers[0]);
+            return res.status(status).json(Array.isArray(body) ? answers : answers[0]);
         } catch (err) { return next(err); }
     });
     return router;
