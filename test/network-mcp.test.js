@@ -87,6 +87,28 @@ async function fakeFetch(url, opts = {}) {
         assert.ok(!calls.some((c) => c.url.startsWith('https://elsewhere.example')), 'and nothing fetched it');
         const missing = await call('openvibe_get', { site: 'deals', path: '/api/v1/deals/zzz' });
         assert.deepStrictEqual([missing.isError, missing.structuredContent.status], [true, 404], 'the site\'s own 404 comes back as an error result');
+
+        // MCP 2026-07-28 (stateless; 2026-11-16, openvibe-sdk/mcp): the version and the method on every request,
+        // server/discover, resultType on every result, a cacheable tool list; the handshake above still works.
+        const mcpKit = require('openvibe-sdk/mcp');
+        const modern = async (method, params = {}, extra = {}) => {
+            const built = mcpKit.modernRequest({ id: 50, method, params, clientInfo: { name: 'test', version: '1' } });
+            const r = await fetch(`${base}/mcp`, { method: 'POST', headers: { ...built.headers, ...extra }, body: JSON.stringify(built.body) });
+            return { status: r.status, body: await r.json() };
+        };
+        let m = await modern('server/discover');
+        assert.deepStrictEqual([m.status, m.body.result.resultType, m.body.result.cacheScope], [200, 'complete', 'public']);
+        assert.ok(m.body.result.supportedVersions.includes('2026-07-28') && m.body.result.supportedVersions.includes('2025-06-18'));
+        m = await modern('tools/list');
+        assert.deepStrictEqual([m.status, m.body.result.resultType, m.body.result.cacheScope], [200, 'complete', 'public']);
+        m = await modern('tools/call', { name: 'openvibe_get', arguments: { site: 'deals', path: '/api/v1/deals/hot' } });
+        assert.deepStrictEqual([m.status, m.body.result.resultType], [200, 'complete']);
+        m = await modern('tools/list', {}, { 'Mcp-Method': 'tools/call' });
+        assert.deepStrictEqual([m.status, m.body.error.code], [400, -32020], 'a header that disagrees is refused');
+        m = await modern('resources/list');
+        assert.deepStrictEqual([m.status, m.body.error.code], [404, -32601], 'an unknown method is a 404');
+        const pre = await fetch(`${base}/mcp`, { method: 'OPTIONS' });
+        assert.match(pre.headers.get('access-control-allow-headers'), /Mcp-Method.*Mcp-Name/, 'the preflight lets the new headers through');
         console.log('network mcp: ok');
     } finally {
         server.close();
