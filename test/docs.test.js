@@ -18,7 +18,7 @@ const sdkPkg = require('openvibe-sdk/package.json');
     const t = await boot();
 
     await check('package.json pins the contracts, SDK and shared tags that are installed', async () => {
-        const tag = (dep) => (pkg.dependencies[dep].match(/refs\/tags\/(v[0-9.]+)$/) || [])[1];
+        const tag = (dep) => { const t = pkg.dependencies[dep].match(/refs\/tags\/(v[0-9.]+)$|\/archive\/(v[0-9.]+?)\.tar\.gz$/) || []; return t[1] || t[2]; };
         assert.strictEqual(tag('openvibe-contracts'), `v${contractsVersion}`);
         assert.strictEqual(tag('openvibe-sdk'), `v${sdkPkg.version}`);
         assert.strictEqual(tag('openvibe-shared'), `v${require('openvibe-shared/package.json').version}`);
