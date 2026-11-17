@@ -64,9 +64,24 @@ const TOOLS = [
         },
         annotations: { readOnlyHint: true, openWorldHint: false },
     },
+    // The network's tools in two (plan §AD.26 step 2, server/http/network-code.js): every site's own MCP tools.
+    {
+        name: 'openvibe_search',
+        title: 'Find tools across the network',
+        description: 'Find tools from every OpenVibe site that serves MCP (Design, Vision, Tools, Compare …) by what you want to do ("audit a page", "check a screenshot", "dns lookup"). Answers each as a typed signature, the way openvibe_execute calls it, with its site and description. Search before you write code.',
+        inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'what you want to do, in a few words' }, limit: { type: 'integer', description: 'how many tools at most (12 when left out, 30 at most)' } }, required: ['query'], additionalProperties: false },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    {
+        name: 'openvibe_execute',
+        title: 'Run code over the network\'s tools',
+        description: 'Run JavaScript that calls OpenVibe tools and returns only what you need (code mode). Each tool is an async function on `tools`, called with one object, the way openvibe_search shows it: `const a = await tools.design_openvibe_design_audit_page({ url: "https://example.com" }); return a.findings.filter((f) => f.severity === "high");`. Chain, loop and filter in one step; console.log lines come back too. Only the returned value (8 KB at most) reaches you. No network, files or require: only `tools`. 30 seconds and 30 calls a script. Each site sees your OpenVibe sign-in when your client sends one, and decides what you may do; without one, calls are anonymous.',
+        inputSchema: { type: 'object', properties: { code: { type: 'string', description: 'the body of an async function: use await, and return the value you need' } }, required: ['code'], additionalProperties: false },
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
 ];
 
-const INSTRUCTIONS = 'Read the OpenVibe network: openvibe_sites lists the sites, openvibe_operations lists one site\'s documented GET operations, and openvibe_get calls one of them anonymously. Only public data is reachable; nothing is written.';
+const INSTRUCTIONS = 'Use OpenVibe\'s tools: openvibe_search finds tools across every site that serves MCP, and openvibe_execute runs a short script that calls them and returns only what you need. Read the OpenVibe network: openvibe_sites lists the sites, openvibe_operations lists one site\'s documented GET operations, and openvibe_get calls one of them anonymously. Only public data is reachable; nothing is written.';
 
 const result = (id, value) => ({ jsonrpc: '2.0', id, result: value });
 const error = (id, code, message) => ({ jsonrpc: '2.0', id, error: { code, message } });
@@ -74,7 +89,7 @@ const validId = (id) => typeof id === 'string' || (typeof id === 'number' && Num
 const toolText = (value) => { const s = JSON.stringify(value, null, 2); return s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT)}\n… (cut; the whole answer is in structuredContent)` : s; };
 const fail = (id, message) => result(id, { content: [{ type: 'text', text: message }], isError: true });
 
-function createNetworkMcp({ config, fetchImpl = globalThis.fetch, now = () => Date.now(), log = console } = {}) {
+function createNetworkMcp({ config, fetchImpl = globalThis.fetch, now = () => Date.now(), log = console, runCode } = {}) {
     const networkUrl = String((config && config.network && config.network.url) || 'https://openvibe.network').replace(/\/+$/, '');
     const cache = new Map();   // key → { at, value }
 
@@ -115,6 +130,8 @@ function createNetworkMcp({ config, fetchImpl = globalThis.fetch, now = () => Da
         }));
         return list;
     });
+
+    const code = require('./network-code').createNetworkCode({ sites, cached, fetchImpl, ...(runCode ? { runCode } : {}) });
 
     async function siteOf(name) {
         const key = String(name || '').trim().toLowerCase();
@@ -206,10 +223,22 @@ function createNetworkMcp({ config, fetchImpl = globalThis.fetch, now = () => Da
         return { value: { site: site.id, url, operation: op.path, status: r.status, content_type: type || null, truncated, body } };
     }
 
-    async function callTool(id, params) {
+    async function callTool(id, params, req = null) {
         const name = params.name;
         const args = params.arguments && typeof params.arguments === 'object' && !Array.isArray(params.arguments) ? params.arguments : {};
         try {
+            if (name === 'openvibe_search') {
+                if (typeof args.query !== 'string' || !args.query.trim() || args.query.length > 300) return fail(id, 'openvibe_search needs { query }: what you want to do, in a few words');
+                const found = await code.search(args.query, args.limit);
+                return result(id, { content: [{ type: 'text', text: toolText(found) }], structuredContent: found, isError: false });
+            }
+            if (name === 'openvibe_execute') {
+                if (typeof args.code !== 'string' || !args.code.trim() || args.code.length > 20000) return fail(id, 'openvibe_execute needs { code }: the body of an async function, at most 20,000 characters');
+                const auth = req && typeof req.get === 'function' ? req.get('authorization') || null : null;
+                const ran = await code.execute(args.code, { auth, caller: (req && req.ip) || 'anonymous' });
+                const out = ran.ok ? { result: ran.value, logs: ran.logs || [], calls: ran.calls || 0 } : { error: ran.error, logs: ran.logs || [], calls: ran.calls || 0 };
+                return result(id, { content: [{ type: 'text', text: toolText(out) }], structuredContent: out, isError: !ran.ok });
+            }
             if (name === 'openvibe_sites') {
                 const list = (await sites()).map(({ origin, ...s }) => s);
                 return result(id, { content: [{ type: 'text', text: toolText(list) }], structuredContent: { sites: list }, isError: false });
@@ -244,7 +273,7 @@ function createNetworkMcp({ config, fetchImpl = globalThis.fetch, now = () => Da
         // The same tools for everyone: a public list, kept an hour.
         if (msg.method === 'tools/list') return { answer: result(msg.id, mcp.listResult('tools', TOOLS, { cacheScope: 'public', ttlMs: 3600000 })) };
         if (msg.method === 'tools/call') {
-            const a = await callTool(msg.id, params);
+            const a = await callTool(msg.id, params, req);
             if (a && a.result) a.result = mcp.complete(a.result);
             return { answer: a };
         }
@@ -269,7 +298,7 @@ function createNetworkMcp({ config, fetchImpl = globalThis.fetch, now = () => Da
                 });
             case 'ping': return result(msg.id, {});
             case 'tools/list': return result(msg.id, { tools: TOOLS });
-            case 'tools/call': return await callTool(msg.id, params);
+            case 'tools/call': return await callTool(msg.id, params, req);
             default: return error(msg.id, -32601, 'Method not found');
         }
     }
