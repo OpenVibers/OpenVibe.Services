@@ -123,7 +123,7 @@ async function fakeFetch(url, opts = {}) {
         const found = await call('openvibe_search', { query: 'hot deals prices' });
         assert.strictEqual(found.isError, false);
         assert.deepStrictEqual(found.structuredContent.tools[0], { call: 'tools.deals_deals_hot', site: 'deals', tool: 'deals_hot', signature: 'tools.deals_deals_hot(input: { limit?: number }): Promise<any>', description: '[OpenVibe.Deals] The hot deals right now, with their prices.' });
-        assert.strictEqual(found.structuredContent.total, 2, 'Casino\'s MCP is on another origin: never offered');
+        assert.strictEqual(found.structuredContent.total, 2, 'Casino\'s MCP is on a foreign host: never offered');
         assert.ok(!calls.some((c) => c.url.startsWith('https://evil.example')), 'and never asked');
         const ran = await call('openvibe_execute', { code: 'const h = await tools.deals_deals_hot({ limit: 3 }); console.log(h.deals.length); return { cheap: h.deals.filter((d) => d.price < 20).map((d) => d.id), auth: h.auth };' });
         assert.strictEqual(ran.isError, false, JSON.stringify(ran.structuredContent));

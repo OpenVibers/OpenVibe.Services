@@ -13,7 +13,7 @@
  * tokens of tool list instead of every schema.
  *
  * What keeps it safe:
- *   - The tools are each site's own: its manifest's MCP address on its own https origin, from the Network frame's list
+ *   - The tools are each site's own: its manifest's MCP address on its own https origin (or another openvibe.* host), from the Network frame's list
  *     of sites. A script names a tool, never a URL; this server's own MCP is left out.
  *   - A call is that site's tools/call, nothing else. The caller's own Bearer (when the MCP client sent one) goes only to
  *     an openvibe.* origin of that list, so each site decides what the person may do; with none, calls are anonymous.
@@ -59,11 +59,16 @@ function createNetworkCode({ sites, cached, fetchImpl = globalThis.fetch, runCod
     const index = () => cached('code-index', async () => {
         const list = await sites();
         const out = [];
+        const seen = new Set();
         await Promise.all(list.map(async (s) => {
             if (!s.mcp || s.host === selfHost) return;
             let mcpUrl;
             try { mcpUrl = new URL(s.mcp, s.origin); } catch { return; }
-            if (mcpUrl.origin !== s.origin) return;   // a site's MCP is on its own origin, or it is not offered
+            // A site's MCP is on its own origin, or on another OpenVibe host (openvibe.compare names Bench's,
+            // bench.openvibe.services); anything else is not offered. One MCP two sites name is read once.
+            if (mcpUrl.origin !== s.origin && !(mcpUrl.protocol === 'https:' && OURS.test(mcpUrl.hostname))) return;
+            if (seen.has(mcpUrl.href)) return;
+            seen.add(mcpUrl.href);
             let tools = [];
             try { tools = ((await rpc(mcpUrl.href, 'tools/list', {})).result || {}).tools || []; } catch { return; }
             const site = js(String(s.id).replace(/^openvibe\./i, ''));
