@@ -62,6 +62,7 @@ const INTERNAL = [`http://127.0.0.1:3000${PROBE}`, `http://2130706433${PROBE}`, 
             'server/domain/model-catalog.js': 'OpenVibe AI\'s GET /v1/models (configured OV_AI_PUBLIC_URL, read only, no credential): never a caller-chosen URL',
             'server/domain/project-archive.js': 'no request: a shell snippet in the archive\'s README text',
             'server/http/docs.js': 'Network changelog, Tools catalog and Billing policy (configured)',
+            'server/http/network-code.js': 'the network\'s tools in two (plan §AD.26): only the sites the Network frame lists (network-mcp.js), each one\'s manifest MCP address on its own https origin (tools/list and tools/call, POST, redirect manual, 8 s / 30 s, 256 KB); a script names a tool, never a URL; the caller\'s Bearer goes only to an openvibe.* origin',
             'server/http/network-mcp.js': 'the Network frame (configured OV_NETWORK_URL), then only the https origins it lists: each one\'s /.well-known/agent.json and /openapi.json (on its own origin), and GETs of the paths those documents name (each {param} one segment); never a caller-chosen host, no credential, redirects not followed (AGT-2)',
             'server/http/home.js': 'Network\'s public /api/v1/status (configured OV_NETWORK internal URL) for the home page\'s services-up number; no token',
         };
